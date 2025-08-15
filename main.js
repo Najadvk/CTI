@@ -1,59 +1,18 @@
-const searchForm = document.getElementById("search-form");
-const iocInput = document.getElementById("ioc");
-const resultsDiv = document.getElementById("results");
-const detectedType = document.getElementById("detected-type");
-
-let feed = {};
-
-async function loadFeed() {
-  try {
-    const res = await fetch("feed.json"); // your JSON database
-    feed = await res.json();
-  } catch (err) {
-    resultsDiv.innerHTML = `<p style="color:red;">Failed to load feed</p>`;
-    console.error(err);
-  }
-}
-
-searchForm.addEventListener("submit", (e) => {
+document.getElementById('search-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const query = iocInput.value.trim().toLowerCase();
-  let output = "";
+  const ioc = document.getElementById('ioc').value.trim();
+  let url;
 
-  if (feed.ips[query]) {
-    const info = feed.ips[query];
-    detectedType.textContent = "IP";
-    output = `
-      <p>Status: ${info.status}</p>
-      <p>First Seen: ${info.first_seen || "N/A"}</p>
-      <p>Last Seen: ${info.last_seen || "N/A"}</p>
-      <p>Tags: ${info.tags ? info.tags.join(", ") : "N/A"}</p>
-      <p>Source: ${info.source || "Unknown"}</p>
-    `;
-  } else if (feed.domains[query]) {
-    const info = feed.domains[query];
-    detectedType.textContent = "Domain";
-    output = `
-      <p>Status: ${info.status}</p>
-      <p>First Seen: ${info.first_seen || "N/A"}</p>
-      <p>Tags: ${info.tags ? info.tags.join(", ") : "N/A"}</p>
-      <p>Source: ${info.source || "Unknown"}</p>
-    `;
-  } else if (feed.hashes[query]) {
-    const info = feed.hashes[query];
-    detectedType.textContent = "Hash";
-    output = `
-      <p>Status: ${info.status}</p>
-      <p>Tags: ${info.tags ? info.tags.join(", ") : "N/A"}</p>
-      <p>Source: ${info.source || "Unknown"}</p>
-    `;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) {
+    url = `/.netlify/functions/lookup-ip?ip=${ioc}`;
+  } else if (ioc.includes('.')) {
+    url = `/.netlify/functions/lookup-domain?domain=${ioc}`;
   } else {
-    detectedType.textContent = "Unknown";
-    output = `<p>No info found in feed</p>`;
+    url = `/.netlify/functions/lookup-hash?hash=${ioc}`;
   }
 
-  resultsDiv.innerHTML = output;
+  const res = await fetch(url);
+  const data = await res.json();
+  const status = Object.values(data)[1]; // grabs the "status" value
+  document.getElementById('detected-type').textContent = status;
 });
-
-// Load the feed on page load
-loadFeed();
