@@ -4,9 +4,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultDiv = document.getElementById("results");
   const detectedTypeDiv = document.getElementById("detected-type");
 
+  // Define sources for each IOC type
+  const sources = {
+    ip: ["abuseipdb", "virustotal", "talos"],
+    domain: ["virustotal", "talos"],
+    hash: ["virustotal"]
+  };
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const ioc = input.value.trim();
+
+    if (!ioc) {
+      resultDiv.innerHTML = "<p>Please enter an IOC.</p>";
+      detectedTypeDiv.textContent = "";
+      return;
+    }
+
     const type = detectIOC(ioc);
     detectedTypeDiv.textContent = type || "unknown";
 
@@ -15,12 +29,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    resultDiv.innerHTML = "<p>Loading...</p>";
+
     try {
-      const url = `/.netlify/functions/lookup-${type}?q=${encodeURIComponent(ioc)}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      renderTable(data);
+      // Fetch from all sources in parallel
+      const fetchPromises = sources[type].map(source =>
+        fetch(`/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`)
+          .then(res => res.ok ? res.json() : { error: `HTTP ${res.status}` })
+          .then(data => ({ source, value: data }))
+          .catch(err => ({ source, value: `Error: ${err.message}` }))
+      );
+
+      const results = await Promise.all(fetchPromises);
+      renderTable(results);
     } catch (err) {
       console.error(err);
       resultDiv.innerHTML = `<p>Error: ${err.message}</p>`;
@@ -34,13 +55,12 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
-  function renderTable(data) {
-    if (!data || Object.keys(data).length === 0) {
+  function renderTable(results) {
+    if (!results || results.length === 0) {
       resultDiv.innerHTML = "<p>No data found.</p>";
       return;
     }
 
-    // Build table headers
     let table = `<table border="1" cellpadding="5" cellspacing="0">
       <thead>
         <tr>
@@ -50,12 +70,12 @@ document.addEventListener("DOMContentLoaded", () => {
       </thead>
       <tbody>`;
 
-    for (const [source, value] of Object.entries(data)) {
+    results.forEach(r => {
       table += `<tr>
-        <td>${source}</td>
-        <td>${value}</td>
+        <td>${r.source}</td>
+        <td>${typeof r.value === "object" ? JSON.stringify(r.value, null, 2) : r.value}</td>
       </tr>`;
-    }
+    });
 
     table += "</tbody></table>";
     resultDiv.innerHTML = table;
