@@ -3,28 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Threat Intelligence Feed</title>
+  <title>Threat Intelligence Lookup</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <h1>Threat Intelligence Lookup</h1>
-
-    <!-- Search form -->
-    <form id="search-form">
-      <input 
-        type="text" 
-        id="ioc" 
-        placeholder="Enter IP address to check..." 
-        required 
-      />
-      <button type="submit">Search</button>
-    </form>
-
-    <!-- Where results will appear -->
-    <div id="results"></div>
+    <div class="header">
+      <h1>Threat Intelligence Lookup</h1>
+      <p class="sub">Search for malicious IPs using AbuseIPDB</p>
+    </div>
+    <div class="search">
+      <input id="searchInput" class="input" type="text" placeholder="Enter IP address (e.g., 8.8.8.8)">
+      <button onclick="searchIP()" class="btn">Search</button>
+    </div>
+    <div id="searchResult"></div>
+    <div id="feed"></div>
   </div>
-
   <script src="main.js"></script>
 </body>
 </html>
