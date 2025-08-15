@@ -1,26 +1,14 @@
-export async function handler(event) {
-  const domain = event.queryStringParameters.q;
-  let result = {};
+const fs = require('fs');
+const path = require('path');
 
-  // RDAP WHOIS (free)
-  const rdapRes = await fetch(`https://rdap.org/domain/${domain}`);
-  result.rdap = await rdapRes.json();
+exports.handler = async (event) => {
+  const domain = event.queryStringParameters.domain;
+  const filePath = path.join(__dirname, '..', '..', 'feed.json');
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
-  // DNS records (free)
-  const dnsRes = await fetch(`https://dns.google/resolve?name=${domain}`);
-  result.dns = await dnsRes.json();
-
-  // Optional VirusTotal
-  const vtKey = process.env.VT_API_KEY;
-  if (vtKey) {
-    const vtRes = await fetch(`https://www.virustotal.com/api/v3/domains/${domain}`, {
-      headers: { "x-apikey": vtKey }
-    });
-    result.virusTotal = await vtRes.json();
-  }
-
+  const status = data.domains[domain] || 'unknown';
   return {
     statusCode: 200,
-    body: JSON.stringify(result)
+    body: JSON.stringify({ domain, status }),
   };
-}
+};
