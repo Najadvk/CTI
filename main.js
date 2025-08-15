@@ -4,7 +4,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultDiv = document.getElementById("results");
   const detectedTypeDiv = document.getElementById("detected-type");
 
-  // Form submit handler
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const ioc = input.value.trim();
@@ -12,28 +11,53 @@ document.addEventListener("DOMContentLoaded", () => {
     detectedTypeDiv.textContent = type || "unknown";
 
     if (!type) {
-      resultDiv.textContent = "Unable to detect IOC type.";
+      resultDiv.innerHTML = "<p>Unable to detect IOC type.</p>";
       return;
     }
 
     try {
       const url = `/.netlify/functions/lookup-${type}?q=${encodeURIComponent(ioc)}`;
-      console.log("Fetching:", url);
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      renderTable(data);
     } catch (err) {
       console.error(err);
-      resultDiv.textContent = `Error: ${err.message}`;
+      resultDiv.innerHTML = `<p>Error: ${err.message}</p>`;
     }
   });
 
-  // IOC type detection
   function detectIOC(ioc) {
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
     if (/^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/.test(ioc)) return "hash";
     if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ioc)) return "domain";
     return null;
+  }
+
+  function renderTable(data) {
+    if (!data || Object.keys(data).length === 0) {
+      resultDiv.innerHTML = "<p>No data found.</p>";
+      return;
+    }
+
+    // Build table headers
+    let table = `<table border="1" cellpadding="5" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    for (const [source, value] of Object.entries(data)) {
+      table += `<tr>
+        <td>${source}</td>
+        <td>${value}</td>
+      </tr>`;
+    }
+
+    table += "</tbody></table>";
+    resultDiv.innerHTML = table;
   }
 });
