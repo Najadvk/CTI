@@ -2,42 +2,112 @@ async function loadThreatFeed() {
   const feedDiv = document.getElementById("feed");
   feedDiv.innerHTML = "<h2>Latest Malicious IPs</h2><p>Loading...</p>";
 
+  // Check for cached feed
+  const cachedFeed = localStorage.getItem("threatFeed");
+  const cacheTime = localStorage.getItem("threatFeedTime");
+  const cacheAge = cacheTime ? (Date.now() - parseInt(cacheTime)) / (1000 * 60 * 60) : Infinity;
+
+  console.log("Cache age (hours):", cacheAge, "Cached feed exists:", !!cachedFeed);
+
+  if (cachedFeed && cacheAge < 24) {
+    try {
+      const result = JSON.parse(cachedFeed);
+      console.log("Cached feed:", result);
+      if (result.type === "feed" && result.feed && result.feed.data && Array.isArray(result.feed.data)) {
+        renderFeed(result, feedDiv);
+        feedDiv.innerHTML += "<p>Loaded from cache (valid for 24 hours).</p>";
+        return;
+      } else {
+        console.warn("Invalid cached feed structure");
+      }
+    } catch (err) {
+      console.error("Failed to parse cached feed:", err);
+    }
+  }
+
   try {
     const res = await fetch("/.netlify/functions/fetch-threats");
+    console.log("Fetch response status:", res.status);
+    if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
     const result = await res.json();
+    console.log("Fetch response:", result);
 
     feedDiv.innerHTML = "<h2>Latest Malicious IPs</h2>";
 
-    if (result.type === "feed" && result.feed && result.feed.data) {
-      const table = document.createElement("table");
-      const thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>IP Address</th><th>Abuse Score</th><th>Last Reported</th></tr>";
-      table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      result.feed.data.forEach(item => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${item.ipAddress}</td>
-          <td class="${item.abuseConfidenceScore >= 50 ? 'status-malicious' : 'status-clean'}">${item.abuseConfidenceScore}</td>
-          <td>${item.lastReportedAt || "N/A"}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
-      feedDiv.appendChild(table);
+    if (result.error) {
+      feedDiv.innerHTML += `<p>Error: ${result.error}. Using cached data if available.</p>`;
+      if (cachedFeed) {
+        try {
+          const cachedResult = JSON.parse(cachedFeed);
+          if (cachedResult.type === "feed" && cachedResult.feed && cachedResult.feed.data && Array.isArray(cachedResult.feed.data)) {
+            renderFeed(cachedResult, feedDiv);
+            feedDiv.innerHTML += "<p>Showing cached data due to rate limit.</p>";
+          } else {
+            feedDiv.innerHTML += "<p>No valid cached data available. Rate limit exceeded (limited to 5 checks/day). Please try again after midnight UTC or upgrade your AbuseIPDB plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+          }
+        } catch (err) {
+          feedDiv.innerHTML += "<p>No valid cached data available. Rate limit exceeded (limited to 5 checks/day). Please try again after midnight UTC or upgrade your AbuseIPDB plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+          console.error("Failed to parse cached feed on error:", err);
+        }
+      } else {
+        feedDiv.innerHTML += "<p>No cached data available. Rate limit exceeded (limited to 5 checks/day). Please try again after midnight UTC or upgrade your AbuseIPDB plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+      }
+      return;
+    }
+
+    if (result.type === "feed" && result.feed && result.feed.data && Array.isArray(result.feed.data)) {
+      localStorage.setItem("threatFeed", JSON.stringify(result));
+      localStorage.setItem("threatFeedTime", Date.now().toString());
+      console.log("Cached new feed:", result);
+      renderFeed(result, feedDiv);
     } else {
-      feedDiv.innerHTML += "<p>No feed data available.</p>";
+      feedDiv.innerHTML += `<p>No feed data available: ${result.error || "Unexpected response format"}</p>`;
     }
   } catch (err) {
-    feedDiv.innerHTML = `<p>Error: ${err.message}</p>`;
+    feedDiv.innerHTML = `<p>Error: ${err.message}. Using cached data if available.</p>`;
+    if (cachedFeed) {
+      try {
+        const cachedResult = JSON.parse(cachedFeed);
+        if (cachedResult.type === "feed" && cachedResult.feed && cachedResult.feed.data && Array.isArray(cachedResult.feed.data)) {
+          renderFeed(cachedResult, feedDiv);
+          feedDiv.innerHTML += "<p>Showing cached data due to error.</p>";
+        } else {
+          feedDiv.innerHTML += "<p>No valid cached data available. Rate limit exceeded (limited to 5 checks/day). Please try again after midnight UTC or upgrade your AbuseIPDB plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+        }
+      } catch (err) {
+        feedDiv.innerHTML += "<p>No valid cached data available. Rate limit exceeded (limited to 5 checks/day). Please try again after midnight UTC or upgrade your AbuseIPDB plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+        console.error("Failed to parse cached feed on error:", err);
+      }
+    } else {
+      feedDiv.innerHTML += "<p>No cached data available. Rate limit exceeded (limited to 5 checks/day). Please try again after midnight UTC or upgrade your AbuseIPDB plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+    }
+    console.error("Feed fetch error:", err);
   }
+}
+
+function renderFeed(result, feedDiv) {
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  thead.innerHTML = "<tr><th>IP Address</th><th>Abuse Score</th><th>Last Reported</th></tr>";
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  result.feed.data.forEach(item => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.ipAddress}</td>
+      <td class="${item.abuseConfidenceScore >= 50 ? 'status-malicious' : 'status-clean'}">${item.abuseConfidenceScore}</td>
+      <td>${item.lastReportedAt || "N/A"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  feedDiv.appendChild(table);
 }
 
 async function searchIP() {
   const ip = document.getElementById("searchInput").value.trim();
   const searchDiv = document.getElementById("searchResult");
 
-  // Basic IP validation (IPv4 or IPv6)
   const ipRegex = /^(?:(?:[0-9]{1,3}\.){3}[0-9]{1,3}|(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4})$/;
   if (!ip || !ipRegex.test(ip)) {
     searchDiv.innerHTML = "<h2>Search Result</h2><p>Please enter a valid IP address.</p>";
@@ -48,9 +118,17 @@ async function searchIP() {
 
   try {
     const res = await fetch(`/.netlify/functions/fetch-threats?ip=${encodeURIComponent(ip)}`);
+    console.log("Search response status:", res.status);
+    if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
     const result = await res.json();
+    console.log("Search response:", result);
 
     searchDiv.innerHTML = "<h2>Search Result</h2>";
+
+    if (result.error) {
+      searchDiv.innerHTML += `<p>Error: ${result.error}</p>`;
+      return;
+    }
 
     if (result.type === "lookup" && result.data && result.data.data) {
       const d = result.data.data;
@@ -66,10 +144,11 @@ async function searchIP() {
         </table>
       `;
     } else {
-      searchDiv.innerHTML += "<p>No results found.</p>";
+      searchDiv.innerHTML += `<p>No results found: ${result.error || "Unexpected response format"}</p>`;
     }
   } catch (err) {
     searchDiv.innerHTML = `<p>Error: ${err.message}</p>`;
+    console.error("Search error:", err);
   }
 }
 
