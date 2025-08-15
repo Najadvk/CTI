@@ -1,4 +1,4 @@
-console.log("Main.js: Script loaded");
+console.log("Main.js: Script loaded (v3.0)");
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Main.js: DOMContentLoaded fired");
   const form = document.getElementById("search-form");
@@ -8,10 +8,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const summaryDiv = document.getElementById("summary");
   const errorDiv = document.getElementById("error");
 
-  // Verify DOM elements
-  console.log("Main.js: Checking DOM elements", { form, input, resultDiv, detectedTypeP, summaryDiv, errorDiv });
+  // Log DOM elements individually
+  console.log("Main.js: DOM element - search-form:", !!form);
+  console.log("Main.js: DOM element - ioc:", !!input);
+  console.log("Main.js: DOM element - results:", !!resultDiv);
+  console.log("Main.js: DOM element - detected-type:", !!detectedTypeP);
+  console.log("Main.js: DOM element - summary:", !!summaryDiv);
+  console.log("Main.js: DOM element - error:", !!errorDiv);
+
+  // Check DOM elements
   if (!form || !input || !resultDiv || !detectedTypeP || !summaryDiv) {
-    console.error("Main.js: Missing DOM elements:", { form: !!form, input: !!input, resultDiv: !!resultDiv, detectedTypeP: !!detectedTypeP, summaryDiv: !!summaryDiv });
+    console.error("Main.js: Missing DOM elements:", {
+      "search-form": !!form,
+      "ioc": !!input,
+      "results": !!resultDiv,
+      "detected-type": !!detectedTypeP,
+      "summary": !!summaryDiv
+    });
     if (resultDiv) {
       resultDiv.innerHTML = "<p>Error: Required HTML elements missing. Check index.html or deployment.</p>";
     }
@@ -128,48 +141,4 @@ document.addEventListener("DOMContentLoaded", () => {
       const sourceName = { virustotal: "VirusTotal" }[src] || src;
       tableHTML += `<tr id="row-${src}">
         <td>${sourceName}</td>
-        <td style="color: gray;">Loading...</td>
-        <td>-</td>
-      </tr>`;
-    });
-    tableHTML += "</tbody></table>";
-    resultDiv.innerHTML = tableHTML;
-    summaryDiv.innerText = "Fetching results...";
-
-    const fetchPromises = sources[type].map(async (source) => {
-      const url = `/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`;
-      const data = await fetchWithRetry(url);
-      const row = document.getElementById(`row-${source}`);
-      if (!row) {
-        console.error(`Main.js: Row for ${source} not found`);
-        return { source, status: "Error", details: "Row not found" };
-      }
-
-      let statusText, detailsText;
-      if (data.error) {
-        statusText = "Error";
-        detailsText = data.error;
-      } else if (data.status) {
-        statusText = data.status;
-        detailsText = data.details || "No details available";
-      } else {
-        statusText = "Unknown";
-        detailsText = "No data returned";
-      }
-
-      row.cells[1].innerText = statusText;
-      row.cells[1].style.color = getStatusColor(statusText);
-      row.cells[2].innerText = detailsText;
-
-      return { source, status: statusText, details: detailsText };
-    });
-
-    try {
-      const results = await Promise.all(fetchPromises);
-      summaryDiv.innerText = summarizeResults(results);
-    } catch (err) {
-      console.error("Main.js: Error in fetch promises:", err);
-      summaryDiv.innerText = "Error fetching results; check console for details.";
-    }
-  });
-});
+        <td style="color: gray;">Loading
