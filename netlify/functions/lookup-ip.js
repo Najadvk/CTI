@@ -1,22 +1,14 @@
-export async function handler(event) {
-  const ip = event.queryStringParameters.q;
-  let result = {};
+const fs = require('fs');
+const path = require('path');
 
-  // Free data
-  const ipRes = await fetch(`http://ip-api.com/json/${ip}`);
-  result.freeData = await ipRes.json();
+exports.handler = async (event) => {
+  const ip = event.queryStringParameters.ip;
+  const filePath = path.join(__dirname, '..', '..', 'feed.json');
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
-  // Optional VirusTotal
-  const vtKey = process.env.VT_API_KEY;
-  if (vtKey) {
-    const vtRes = await fetch(`https://www.virustotal.com/api/v3/ip_addresses/${ip}`, {
-      headers: { "x-apikey": vtKey }
-    });
-    result.virusTotal = await vtRes.json();
-  }
-
+  const status = data.ips[ip] || 'unknown';
   return {
     statusCode: 200,
-    body: JSON.stringify(result)
+    body: JSON.stringify({ ip, status }),
   };
-}
+};
