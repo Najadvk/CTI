@@ -1,90 +1,69 @@
-const feedUrl = "/feed.json"; // This is the JSON created by fetch-feed.js
+const tableBody = document.querySelector('#threat-table tbody');
+const searchInput = document.querySelector('#ioc');
+const searchForm = document.querySelector('#search-form');
 
-let feedData = null;
+let threatData = {};
 
-// Fetch feed.json on page load
-async function loadFeed() {
+// Fetch threat feed from Netlify function
+async function fetchThreatFeed() {
   try {
-    const res = await fetch(feedUrl);
-    feedData = await res.json();
-    displayFeed(feedData);
-  } catch (err) {
-    console.error("Failed to load feed:", err);
-    document.getElementById("results").innerHTML = "<p>Failed to load feed</p>";
+    const response = await fetch('/.netlify/functions/fetch-threats');
+    threatData = await response.json();
+    displayTable(threatData);
+  } catch (error) {
+    console.error('Failed to fetch threat feed:', error);
+    tableBody.innerHTML = '<tr><td colspan="3">Failed to load threat feed</td></tr>';
   }
 }
 
-// Display the feed in a table
-function displayFeed(feed) {
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "";
-
-  // IPs
-  const ipTable = createTable("IPs", feed.ips);
-  resultsDiv.appendChild(ipTable);
-
-  // Domains
-  const domainTable = createTable("Domains", feed.domains);
-  resultsDiv.appendChild(domainTable);
-
-  // Hashes
-  const hashTable = createTable("Hashes", feed.hashes);
-  resultsDiv.appendChild(hashTable);
+// Display table rows
+function displayTable(data) {
+  tableBody.innerHTML = '';
+  for (const [ip, status] of Object.entries(data.ips || {})) {
+    addRow('IP', ip, status);
+  }
+  for (const [domain, status] of Object.entries(data.domains || {})) {
+    addRow('Domain', domain, status);
+  }
+  for (const [hash, status] of Object.entries(data.hashes || {})) {
+    addRow('Hash', hash, status);
+  }
 }
 
-// Create a table for a feed section
-function createTable(title, data) {
-  const section = document.createElement("div");
-  section.innerHTML = `<h2>${title}</h2>`;
-
-  const table = document.createElement("table");
-  table.innerHTML = `
-    <tr>
-      <th>Value</th>
-      <th>Status</th>
-      <th>Category</th>
-      <th>Source</th>
-      <th>Confidence</th>
-      <th>First Seen</th>
-    </tr>
+// Add a single row
+function addRow(type, indicator, status) {
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td>${type}</td>
+    <td>${indicator}</td>
+    <td class="status-${status}">${status}</td>
   `;
-
-  for (const key in data) {
-    const row = document.createElement("tr");
-    const entry = data[key];
-    row.innerHTML = `
-      <td>${key}</td>
-      <td>${entry.status}</td>
-      <td>${entry.category}</td>
-      <td>${entry.source}</td>
-      <td>${entry.confidence}</td>
-      <td>${entry.first_seen}</td>
-    `;
-    table.appendChild(row);
-  }
-
-  section.appendChild(table);
-  return section;
+  tableBody.appendChild(row);
 }
 
-// Search form
-document.getElementById("search-form").addEventListener("submit", (e) => {
+// Search functionality
+searchForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const query = document.getElementById("ioc").value.trim();
-  if (!feedData) return;
+  const query = searchInput.value.trim().toLowerCase();
+  if (!query) return;
+  
+  const filteredData = { ips: {}, domains: {}, hashes: {} };
+  
+  for (const [ip, status] of Object.entries(threatData.ips || {})) {
+    if (ip.includes(query)) filteredData.ips[ip] = status;
+  }
+  for (const [domain, status] of Object.entries(threatData.domains || {})) {
+    if (domain.includes(query)) filteredData.domains[domain] = status;
+  }
+  for (const [hash, status] of Object.entries(threatData.hashes || {})) {
+    if (hash.includes(query)) filteredData.hashes[hash] = status;
+  }
 
-  const result = searchFeed(query);
-  displayFeed(result);
+  displayTable(filteredData);
 });
 
-// Search function
-function searchFeed(query) {
-  const result = { ips: {}, domains: {}, hashes: {} };
-  if (feedData.ips[query]) result.ips[query] = feedData.ips[query];
-  if (feedData.domains[query]) result.domains[query] = feedData.domains[query];
-  if (feedData.hashes[query]) result.hashes[query] = feedData.hashes[query];
-  return result;
-}
+// Initial fetch
+fetchThreatFeed();
 
-// Load feed on page load
-loadFeed();
+// Refresh every 24 hours
+setInterval(fetchThreatFeed, 24 * 60 * 60 * 1000);
