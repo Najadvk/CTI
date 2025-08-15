@@ -1,61 +1,39 @@
-// /functions/fetch-threats.js
 const fetch = require("node-fetch");
 
-exports.handler = async function () {
+exports.handler = async () => {
   try {
-    // Sources: Public threat feeds
-    const feeds = {
-      ips: [
-        "https://www.abuseipdb.com/blacklist?format=csv", // example CSV feed
-        "https://www.spamhaus.org/drop/drop.txt"
-      ],
-      domains: [
-        "https://otx.alienvault.com/api/v1/indicators/export?type=domain&limit=50"
-      ],
-      hashes: [
-        "https://bazaar.abuse.ch/export/txt/recent/"
-      ]
-    };
+    // Example sources (free public threat feeds)
+    const feeds = [
+      "https://raw.githubusercontent.com/stamparm/ipsum/main/ipsum.txt", // Malicious IPs
+      "https://mirror.cedia.org.ec/malwaredomains/justdomains", // Malicious Domains
+    ];
 
-    const result = { ips: {}, domains: {}, hashes: {} };
+    const threatData = { ips: {}, domains: {}, hashes: {} };
 
-    // --- FETCH IPS ---
-    for (const url of feeds.ips) {
-      const res = await fetch(url);
-      const text = await res.text();
-      text.split("\n").forEach(line => {
-        const ip = line.trim();
-        if (ip && !ip.startsWith("#")) result.ips[ip] = "malicious";
-      });
-    }
+    // Fetch IPs
+    const ipRes = await fetch(feeds[0]);
+    const ipText = await ipRes.text();
+    ipText.split("\n").forEach(line => {
+      const ip = line.trim();
+      if (ip) threatData.ips[ip] = "malicious";
+    });
 
-    // --- FETCH DOMAINS ---
-    for (const url of feeds.domains) {
-      const res = await fetch(url);
-      const data = await res.json();
-      data.forEach(item => {
-        if (item.indicator) result.domains[item.indicator] = "malicious";
-      });
-    }
-
-    // --- FETCH HASHES ---
-    for (const url of feeds.hashes) {
-      const res = await fetch(url);
-      const text = await res.text();
-      text.split("\n").forEach(line => {
-        const hash = line.trim();
-        if (hash && hash.length >= 32) result.hashes[hash] = "malicious";
-      });
-    }
+    // Fetch Domains
+    const domRes = await fetch(feeds[1]);
+    const domText = await domRes.text();
+    domText.split("\n").forEach(line => {
+      const dom = line.trim();
+      if (dom && !dom.startsWith("#")) threatData.domains[dom] = "malicious";
+    });
 
     return {
       statusCode: 200,
-      body: JSON.stringify(result)
+      body: JSON.stringify(threatData),
     };
   } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message })
+      body: JSON.stringify({ error: err.message }),
     };
   }
 };
