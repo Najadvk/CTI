@@ -1,3 +1,5 @@
+let refreshInterval;
+
 async function loadThreatFeed(refresh = false) {
   const feedDiv = document.getElementById("feed");
   feedDiv.innerHTML = "<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Loading...</p>";
@@ -16,7 +18,8 @@ async function loadThreatFeed(refresh = false) {
         console.log("Cached feed:", result);
         if (result.type === "feed" && result.feed && Array.isArray(result.feed)) {
           renderFeed(result, feedDiv);
-          feedDiv.innerHTML += "<p>Loaded from cache (valid for 24 hours).</p>";
+          feedDiv.innerHTML += "<p>Loaded from cache (valid for 24 hours). Auto-updates every 10 minutes.</p>";
+          startAutoRefresh();
           return;
         } else {
           console.warn("Invalid cached feed structure");
@@ -31,11 +34,12 @@ async function loadThreatFeed(refresh = false) {
     }
     // No cache, show static feed
     renderStaticFeed(feedDiv);
-    feedDiv.innerHTML += "<p>Showing sample data. Click 'Refresh Feed' to fetch latest FireHOL blocklist.</p>";
+    feedDiv.innerHTML += "<p>Showing sample data. Click 'Refresh Feed' to fetch latest FireHOL/Spamhaus blocklists. Auto-updates every 10 minutes.</p>";
+    startAutoRefresh();
     return;
   }
 
-  // Fetch FireHOL blocklist on refresh
+  // Fetch combined blocklist on refresh
   try {
     const res = await fetch("/.netlify/functions/fetch-threats");
     console.log("Fetch response status:", res.status);
@@ -53,21 +57,22 @@ async function loadThreatFeed(refresh = false) {
           const cachedResult = JSON.parse(cachedFeed);
           if (cachedResult.type === "feed" && cachedResult.feed && Array.isArray(cachedResult.feed)) {
             renderFeed(cachedResult, feedDiv);
-            feedDiv.innerHTML += "<p>Showing cached data due to error.</p>";
+            feedDiv.innerHTML += "<p>Showing cached data due to error. Auto-updates every 10 minutes.</p>";
+            startAutoRefresh();
           } else {
             renderStaticFeed(feedDiv);
-            feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL blocklist.</p>";
+            feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
           }
         } catch (err) {
           renderStaticFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL blocklist.</p>";
+          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
           console.error("Failed to parse cached feed on error:", err);
           localStorage.removeItem("threatFeed"); // Clear corrupted cache
           localStorage.removeItem("threatFeedTime");
         }
       } else {
         renderStaticFeed(feedDiv);
-        feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL blocklist.</p>";
+        feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
       }
       return;
     }
@@ -77,6 +82,8 @@ async function loadThreatFeed(refresh = false) {
       localStorage.setItem("threatFeedTime", Date.now().toString());
       console.log("Cached new feed:", result);
       renderFeed(result, feedDiv);
+      feedDiv.innerHTML += "<p>Fetched latest FireHOL/Spamhaus blocklists. Auto-updates every 10 minutes.</p>";
+      startAutoRefresh();
     } else {
       feedDiv.innerHTML += `<p>No feed data available: ${result.error || "Unexpected response format"}</p>`;
       renderStaticFeed(feedDiv);
@@ -89,68 +96,69 @@ async function loadThreatFeed(refresh = false) {
         const cachedResult = JSON.parse(cachedFeed);
         if (cachedResult.type === "feed" && cachedResult.feed && Array.isArray(cachedResult.feed)) {
           renderFeed(cachedResult, feedDiv);
-          feedDiv.innerHTML += "<p>Showing cached data due to error.</p>";
+          feedDiv.innerHTML += "<p>Showing cached data due to error. Auto-updates every 10 minutes.</p>";
+          startAutoRefresh();
         } else {
           renderStaticFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL blocklist.</p>";
+          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
         }
       } catch (err) {
         renderStaticFeed(feedDiv);
-        feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL blocklist.</p>";
+        feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
         console.error("Failed to parse cached feed on error:", err);
         localStorage.removeItem("threatFeed"); // Clear corrupted cache
         localStorage.removeItem("threatFeedTime");
       }
     } else {
       renderStaticFeed(feedDiv);
-      feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL blocklist.</p>";
+      feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
     }
     console.error("Feed fetch error:", err);
   }
 }
 
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => loadThreatFeed(true), 600000); // Refresh every 10 minutes
+}
+
 function renderFeed(result, feedDiv) {
-  const table = document.createElement("table");
-  const thead = document.createElement("thead");
-  thead.innerHTML = "<tr><th>IP Address</th><th>Status</th><th>Source</th></tr>";
-  table.appendChild(thead);
-  const tbody = document.createElement("tbody");
-  result.feed.slice(0, 50).forEach(item => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.ipAddress}</td>
-      <td class="status-malicious">Malicious</td>
-      <td>FireHOL</td>
-    `;
-    tbody.appendChild(tr);
+  const select = document.createElement("select");
+  select.className = "feed-select";
+  select.innerHTML = '<option value="">Select an IP</option>';
+  result.feed.slice(0, 100).forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.ipAddress;
+    option.textContent = `${item.ipAddress} (${item.source})`;
+    select.appendChild(option);
   });
-  table.appendChild(tbody);
-  feedDiv.appendChild(table);
+  const container = document.createElement("div");
+  container.className = "feed-container";
+  container.appendChild(select);
+  feedDiv.appendChild(container);
 }
 
 function renderStaticFeed(feedDiv) {
-  const table = document.createElement("table");
-  const thead = document.createElement("thead");
-  thead.innerHTML = "<tr><th>IP Address</th><th>Status</th><th>Source</th></tr>";
-  table.appendChild(thead);
-  const tbody = document.createElement("tbody");
+  const select = document.createElement("select");
+  select.className = "feed-select";
+  select.innerHTML = '<option value="">Select an IP</option>';
   const sampleData = [
     { ipAddress: "45.146.164.125", status: "Malicious", source: "Sample" },
     { ipAddress: "118.25.6.39", status: "Malicious", source: "Sample" },
-    { ipAddress: "185.173.35.14", status: "Malicious", source: "Sample" }
+    { ipAddress: "185.173.35.14", status: "Malicious", source: "Sample" },
+    { ipAddress: "103.196.36.10", status: "Malicious", source: "Sample" }
   ];
   sampleData.forEach(item => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.ipAddress}</td>
-      <td class="status-malicious">${item.status}</td>
-      <td>${item.source}</td>
-    `;
-    tbody.appendChild(tr);
+    const option = document.createElement("option");
+    option.value = item.ipAddress;
+    option.textContent = `${item.ipAddress} (${item.source})`;
+    select.appendChild(option);
   });
-  table.appendChild(tbody);
-  feedDiv.appendChild(table);
-  feedDiv.innerHTML += "<p>Showing sample data due to API unavailability.</p>";
+  const container = document.createElement("div");
+  container.className = "feed-container";
+  container.appendChild(select);
+  feedDiv.appendChild(container);
+  feedDiv.innerHTML += "<p>Showing sample data due to unavailability.</p>";
 }
 
 async function refreshFeed() {
