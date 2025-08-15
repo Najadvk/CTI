@@ -1,4 +1,4 @@
-async function loadThreatFeed(refresh = false) {
+async function loadThreatFeed(force = false) {
   const feedDiv = document.getElementById("feed");
   feedDiv.innerHTML = "<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Loading...</p>";
 
@@ -23,8 +23,6 @@ async function loadThreatFeed(refresh = false) {
         }
       } catch (err) {
         console.error("Failed to parse cached feed:", err);
-        localStorage.removeItem("threatFeed"); // Clear corrupted cache
-        localStorage.removeItem("threatFeedTime");
       }
     }
   }
@@ -49,19 +47,17 @@ async function loadThreatFeed(refresh = false) {
               renderFeed(cachedResult, feedDiv);
               feedDiv.innerHTML += "<p>Showing cached data due to rate limit.</p>";
             } else {
-              renderStaticFeed(feedDiv);
-              feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after 1:00 AM BST (midnight UTC, August 16, 2025) or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+              renderPlaceholderFeed(feedDiv);
+              feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
             }
           } catch (err) {
-            renderStaticFeed(feedDiv);
-            feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after 1:00 AM BST (midnight UTC, August 16, 2025) or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+            renderPlaceholderFeed(feedDiv);
+            feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
             console.error("Failed to parse cached feed on error:", err);
-            localStorage.removeItem("threatFeed"); // Clear corrupted cache
-            localStorage.removeItem("threatFeedTime");
           }
         } else {
-          renderStaticFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No cached data. Rate limit exceeded (limited to 5 checks/day). Try again after 1:00 AM BST (midnight UTC, August 16, 2025) or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+          renderPlaceholderFeed(feedDiv);
+          feedDiv.innerHTML += "<p>No cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
         }
       }
       return;
@@ -74,7 +70,7 @@ async function loadThreatFeed(refresh = false) {
       renderFeed(result, feedDiv);
     } else {
       feedDiv.innerHTML += `<p>No feed data available: ${result.error || "Unexpected response format"}</p>`;
-      renderStaticFeed(feedDiv);
+      renderPlaceholderFeed(feedDiv);
     }
   } catch (err) {
     feedDiv.innerHTML = `<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Error: ${err.message}. Using cached data if available.</p>`;
@@ -87,19 +83,17 @@ async function loadThreatFeed(refresh = false) {
             renderFeed(cachedResult, feedDiv);
             feedDiv.innerHTML += "<p>Showing cached data due to error.</p>";
           } else {
-            renderStaticFeed(feedDiv);
-            feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after 1:00 AM BST (midnight UTC, August 16, 2025) or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+            renderPlaceholderFeed(feedDiv);
+            feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
           }
         } catch (err) {
-          renderStaticFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after 1:00 AM BST (midnight UTC, August 16, 2025) or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+          renderPlaceholderFeed(feedDiv);
+          feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
           console.error("Failed to parse cached feed on error:", err);
-          localStorage.removeItem("threatFeed"); // Clear corrupted cache
-          localStorage.removeItem("threatFeedTime");
         }
       } else {
-        renderStaticFeed(feedDiv);
-        feedDiv.innerHTML += "<p>No cached data. Rate limit exceeded (limited to 5 checks/day). Try again after 1:00 AM BST (midnight UTC, August 16, 2025) or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+        renderPlaceholderFeed(feedDiv);
+        feedDiv.innerHTML += "<p>No cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
       }
     }
     console.error("Feed fetch error:", err);
@@ -125,28 +119,17 @@ function renderFeed(result, feedDiv) {
   feedDiv.appendChild(table);
 }
 
-function renderStaticFeed(feedDiv) {
+function renderPlaceholderFeed(feedDiv) {
   const table = document.createElement("table");
   const thead = document.createElement("thead");
   thead.innerHTML = "<tr><th>IP Address</th><th>Abuse Score</th><th>Last Reported</th></tr>";
   table.appendChild(thead);
   const tbody = document.createElement("tbody");
-  const sampleData = [
-    { ipAddress: "192.168.1.1", abuseConfidenceScore: 75, lastReportedAt: "2025-08-15T12:00:00Z" },
-    { ipAddress: "10.0.0.1", abuseConfidenceScore: 90, lastReportedAt: "2025-08-14T10:00:00Z" }
-  ];
-  sampleData.forEach(item => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.ipAddress}</td>
-      <td class="${item.abuseConfidenceScore >= 50 ? 'status-malicious' : 'status-clean'}">${item.abuseConfidenceScore}</td>
-      <td>${item.lastReportedAt || "N/A"}</td>
-    `;
-    tbody.appendChild(tr);
-  });
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td colspan="3">Unable to load feed due to API limits. Please try again later.</td>`;
+  tbody.appendChild(tr);
   table.appendChild(tbody);
   feedDiv.appendChild(table);
-  feedDiv.innerHTML += "<p>Showing sample data due to API unavailability.</p>";
 }
 
 async function refreshFeed() {
