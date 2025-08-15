@@ -1,25 +1,14 @@
-export async function handler(event) {
-  const hash = event.queryStringParameters.q;
-  let result = {};
+const fs = require('fs');
+const path = require('path');
 
-  // MalwareBazaar public search
-  const mbRes = await fetch(`https://mb-api.abuse.ch/api/v1/`, {
-    method: "POST",
-    body: new URLSearchParams({ query: "get_info", hash: hash })
-  });
-  result.malwareBazaar = await mbRes.json();
+exports.handler = async (event) => {
+  const hash = event.queryStringParameters.hash;
+  const filePath = path.join(__dirname, '..', '..', 'feed.json');
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
-  // Optional VirusTotal
-  const vtKey = process.env.VT_API_KEY;
-  if (vtKey) {
-    const vtRes = await fetch(`https://www.virustotal.com/api/v3/files/${hash}`, {
-      headers: { "x-apikey": vtKey }
-    });
-    result.virusTotal = await vtRes.json();
-  }
-
+  const status = data.hashes[hash] || 'unknown';
   return {
     statusCode: 200,
-    body: JSON.stringify(result)
+    body: JSON.stringify({ hash, status }),
   };
-}
+};
