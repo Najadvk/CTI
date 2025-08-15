@@ -1,8 +1,15 @@
 let refreshInterval;
 
 async function loadThreatFeed(refresh = false) {
-  const feedDiv = document.getElementById("feed");
-  feedDiv.innerHTML = "<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Loading...</p>";
+  const ipFeedDiv = document.getElementById("ipFeed");
+  const domainFeedDiv = document.getElementById("domainFeed");
+  const hashFeedDiv = document.getElementById("hashFeed");
+  const statusDiv = document.getElementById("feedStatus");
+
+  ipFeedDiv.innerHTML = "<p>Loading...</p>";
+  domainFeedDiv.innerHTML = "<p>Loading...</p>";
+  hashFeedDiv.innerHTML = "<p>Loading...</p>";
+  statusDiv.innerHTML = "Loading threat feeds...";
 
   // Check for cached feed unless refreshing
   if (!refresh) {
@@ -16,9 +23,9 @@ async function loadThreatFeed(refresh = false) {
       try {
         const result = JSON.parse(cachedFeed);
         console.log("Cached feed:", result);
-        if (result.type === "feed" && result.feed && Array.isArray(result.feed)) {
-          renderFeed(result, feedDiv);
-          feedDiv.innerHTML += "<p>Loaded from cache (valid for 24 hours). Auto-updates every 10 minutes.</p>";
+        if (result.type === "feed" && result.ipFeed && result.domainFeed && result.hashFeed && Array.isArray(result.ipFeed) && Array.isArray(result.domainFeed) && Array.isArray(result.hashFeed)) {
+          renderFeed(result, ipFeedDiv, domainFeedDiv, hashFeedDiv);
+          statusDiv.innerHTML = "Loaded from cache (valid for 24 hours). Auto-updates every 10 minutes.";
           startAutoRefresh();
           return;
         } else {
@@ -33,13 +40,13 @@ async function loadThreatFeed(refresh = false) {
       }
     }
     // No cache, show static feed
-    renderStaticFeed(feedDiv);
-    feedDiv.innerHTML += "<p>Showing sample data. Click 'Refresh Feed' to fetch latest FireHOL/Spamhaus blocklists. Auto-updates every 10 minutes.</p>";
+    renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
+    statusDiv.innerHTML = "Showing sample data. Click 'Refresh Feeds' to fetch latest FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds. Auto-updates every 10 minutes.";
     startAutoRefresh();
     return;
   }
 
-  // Fetch combined blocklist on refresh
+  // Fetch combined blocklists on refresh
   try {
     const res = await fetch("/.netlify/functions/fetch-threats");
     console.log("Fetch response status:", res.status);
@@ -47,71 +54,71 @@ async function loadThreatFeed(refresh = false) {
     const result = await res.json();
     console.log("Fetch response:", result);
 
-    feedDiv.innerHTML = "<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button>";
+    statusDiv.innerHTML = "";
 
     if (result.error) {
-      feedDiv.innerHTML += `<p>Error: ${result.error}. Using cached data if available.</p>`;
+      statusDiv.innerHTML = `Error: ${result.error}. Using cached data if available.`;
       const cachedFeed = localStorage.getItem("threatFeed");
       if (cachedFeed) {
         try {
           const cachedResult = JSON.parse(cachedFeed);
-          if (cachedResult.type === "feed" && cachedResult.feed && Array.isArray(cachedResult.feed)) {
-            renderFeed(cachedResult, feedDiv);
-            feedDiv.innerHTML += "<p>Showing cached data due to error. Auto-updates every 10 minutes.</p>";
+          if (cachedResult.type === "feed" && cachedResult.ipFeed && cachedResult.domainFeed && cachedResult.hashFeed && Array.isArray(cachedResult.ipFeed) && Array.isArray(cachedResult.domainFeed) && Array.isArray(cachedResult.hashFeed)) {
+            renderFeed(cachedResult, ipFeedDiv, domainFeedDiv, hashFeedDiv);
+            statusDiv.innerHTML = "Showing cached data due to error. Auto-updates every 10 minutes.";
             startAutoRefresh();
           } else {
-            renderStaticFeed(feedDiv);
-            feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+            renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
+            statusDiv.innerHTML = "No valid cached data. Failed to fetch FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds.";
           }
         } catch (err) {
-          renderStaticFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+          renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
+          statusDiv.innerHTML = "No valid cached data. Failed to fetch FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds.";
           console.error("Failed to parse cached feed on error:", err);
           localStorage.removeItem("threatFeed"); // Clear corrupted cache
           localStorage.removeItem("threatFeedTime");
         }
       } else {
-        renderStaticFeed(feedDiv);
-        feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+        renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
+        statusDiv.innerHTML = "No cached data. Failed to fetch FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds.";
       }
       return;
     }
 
-    if (result.type === "feed" && result.feed && Array.isArray(result.feed)) {
+    if (result.type === "feed" && result.ipFeed && result.domainFeed && result.hashFeed && Array.isArray(result.ipFeed) && Array.isArray(result.domainFeed) && Array.isArray(result.hashFeed)) {
       localStorage.setItem("threatFeed", JSON.stringify(result));
       localStorage.setItem("threatFeedTime", Date.now().toString());
       console.log("Cached new feed:", result);
-      renderFeed(result, feedDiv);
-      feedDiv.innerHTML += "<p>Fetched latest FireHOL/Spamhaus blocklists. Auto-updates every 10 minutes.</p>";
+      renderFeed(result, ipFeedDiv, domainFeedDiv, hashFeedDiv);
+      statusDiv.innerHTML = "Fetched latest FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds. Auto-updates every 10 minutes.";
       startAutoRefresh();
     } else {
-      feedDiv.innerHTML += `<p>No feed data available: ${result.error || "Unexpected response format"}</p>`;
-      renderStaticFeed(feedDiv);
+      statusDiv.innerHTML = `No feed data available: ${result.error || "Unexpected response format"}`;
+      renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
     }
   } catch (err) {
-    feedDiv.innerHTML = `<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Error: ${err.message}. Using cached data if available.</p>`;
+    statusDiv.innerHTML = `Error: ${err.message}. Using cached data if available.`;
     const cachedFeed = localStorage.getItem("threatFeed");
     if (cachedFeed) {
       try {
         const cachedResult = JSON.parse(cachedFeed);
-        if (cachedResult.type === "feed" && cachedResult.feed && Array.isArray(cachedResult.feed)) {
-          renderFeed(cachedResult, feedDiv);
-          feedDiv.innerHTML += "<p>Showing cached data due to error. Auto-updates every 10 minutes.</p>";
+        if (cachedResult.type === "feed" && cachedResult.ipFeed && cachedResult.domainFeed && cachedResult.hashFeed && Array.isArray(cachedResult.ipFeed) && Array.isArray(cachedResult.domainFeed) && Array.isArray(cachedResult.hashFeed)) {
+          renderFeed(cachedResult, ipFeedDiv, domainFeedDiv, hashFeedDiv);
+          statusDiv.innerHTML = "Showing cached data due to error. Auto-updates every 10 minutes.";
           startAutoRefresh();
         } else {
-          renderStaticFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+          renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
+          statusDiv.innerHTML = "No valid cached data. Failed to fetch FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds.";
         }
       } catch (err) {
-        renderStaticFeed(feedDiv);
-        feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+        renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
+        statusDiv.innerHTML = "No valid cached data. Failed to fetch FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds.";
         console.error("Failed to parse cached feed on error:", err);
         localStorage.removeItem("threatFeed"); // Clear corrupted cache
         localStorage.removeItem("threatFeedTime");
       }
     } else {
-      renderStaticFeed(feedDiv);
-      feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+      renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv);
+      statusDiv.innerHTML = "No cached data. Failed to fetch FireHOL/Spamhaus/URLhaus/MalwareBazaar feeds.";
     }
     console.error("Feed fetch error:", err);
   }
@@ -122,43 +129,100 @@ function startAutoRefresh() {
   refreshInterval = setInterval(() => loadThreatFeed(true), 600000); // Refresh every 10 minutes
 }
 
-function renderFeed(result, feedDiv) {
-  const select = document.createElement("select");
-  select.className = "feed-select";
-  select.innerHTML = '<option value="">Select an IP</option>';
-  result.feed.slice(0, 100).forEach(item => {
+function renderFeed(result, ipFeedDiv, domainFeedDiv, hashFeedDiv) {
+  // IP Feed
+  const ipSelect = document.createElement("select");
+  ipSelect.className = "feed-select";
+  ipSelect.innerHTML = '<option value="">Select an IP</option>';
+  result.ipFeed.slice(0, 100).forEach(item => {
     const option = document.createElement("option");
     option.value = item.ipAddress;
     option.textContent = `${item.ipAddress} (${item.source})`;
-    select.appendChild(option);
+    ipSelect.appendChild(option);
   });
-  const container = document.createElement("div");
-  container.className = "feed-container";
-  container.appendChild(select);
-  feedDiv.appendChild(container);
+  ipFeedDiv.innerHTML = "";
+  ipFeedDiv.appendChild(ipSelect);
+
+  // Domain Feed
+  const domainSelect = document.createElement("select");
+  domainSelect.className = "feed-select";
+  domainSelect.innerHTML = '<option value="">Select a Domain</option>';
+  result.domainFeed.slice(0, 50).forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.domain;
+    option.textContent = `${item.domain} (${item.source})`;
+    domainSelect.appendChild(option);
+  });
+  domainFeedDiv.innerHTML = "";
+  domainFeedDiv.appendChild(domainSelect);
+
+  // Hash Feed
+  const hashSelect = document.createElement("select");
+  hashSelect.className = "feed-select";
+  hashSelect.innerHTML = '<option value="">Select a Hash</option>';
+  result.hashFeed.slice(0, 50).forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.hash;
+    option.textContent = `${item.hash.slice(0, 16)}... (${item.source})`;
+    hashSelect.appendChild(option);
+  });
+  hashFeedDiv.innerHTML = "";
+  hashFeedDiv.appendChild(hashSelect);
 }
 
-function renderStaticFeed(feedDiv) {
-  const select = document.createElement("select");
-  select.className = "feed-select";
-  select.innerHTML = '<option value="">Select an IP</option>';
-  const sampleData = [
-    { ipAddress: "45.146.164.125", status: "Malicious", source: "Sample" },
-    { ipAddress: "118.25.6.39", status: "Malicious", source: "Sample" },
-    { ipAddress: "185.173.35.14", status: "Malicious", source: "Sample" },
-    { ipAddress: "103.196.36.10", status: "Malicious", source: "Sample" }
+function renderStaticFeed(ipFeedDiv, domainFeedDiv, hashFeedDiv) {
+  // IP Feed
+  const ipSelect = document.createElement("select");
+  ipSelect.className = "feed-select";
+  ipSelect.innerHTML = '<option value="">Select an IP</option>';
+  const sampleIPs = [
+    { ipAddress: "45.146.164.125", source: "Sample" },
+    { ipAddress: "118.25.6.39", source: "Sample" },
+    { ipAddress: "185.173.35.14", source: "Sample" },
+    { ipAddress: "103.196.36.10", source: "Sample" }
   ];
-  sampleData.forEach(item => {
+  sampleIPs.forEach(item => {
     const option = document.createElement("option");
     option.value = item.ipAddress;
     option.textContent = `${item.ipAddress} (${item.source})`;
-    select.appendChild(option);
+    ipSelect.appendChild(option);
   });
-  const container = document.createElement("div");
-  container.className = "feed-container";
-  container.appendChild(select);
-  feedDiv.appendChild(container);
-  feedDiv.innerHTML += "<p>Showing sample data due to unavailability.</p>";
+  ipFeedDiv.innerHTML = "";
+  ipFeedDiv.appendChild(ipSelect);
+
+  // Domain Feed
+  const domainSelect = document.createElement("select");
+  domainSelect.className = "feed-select";
+  domainSelect.innerHTML = '<option value="">Select a Domain</option>';
+  const sampleDomains = [
+    { domain: "example-malicious.com", source: "Sample" },
+    { domain: "fake-site.net", source: "Sample" }
+  ];
+  sampleDomains.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.domain;
+    option.textContent = `${item.domain} (${item.source})`;
+    domainSelect.appendChild(option);
+  });
+  domainFeedDiv.innerHTML = "";
+  domainFeedDiv.appendChild(domainSelect);
+
+  // Hash Feed
+  const hashSelect = document.createElement("select");
+  hashSelect.className = "feed-select";
+  hashSelect.innerHTML = '<option value="">Select a Hash</option>';
+  const sampleHashes = [
+    { hash: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6", source: "Sample" },
+    { hash: "z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4", source: "Sample" }
+  ];
+  sampleHashes.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.hash;
+    option.textContent = `${item.hash.slice(0, 16)}... (${item.source})`;
+    hashSelect.appendChild(option);
+  });
+  hashFeedDiv.innerHTML = "";
+  hashFeedDiv.appendChild(hashSelect);
 }
 
 async function refreshFeed() {
