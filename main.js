@@ -1,4 +1,6 @@
-async function loadThreatFeed(force = false) {
+let refreshInterval;
+
+async function loadThreatFeed(refresh = false) {
   const feedDiv = document.getElementById("feed");
   feedDiv.innerHTML = "<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Loading...</p>";
 
@@ -14,19 +16,30 @@ async function loadThreatFeed(force = false) {
       try {
         const result = JSON.parse(cachedFeed);
         console.log("Cached feed:", result);
-        if (result.type === "feed" && result.feed && result.feed.data && Array.isArray(result.feed.data)) {
+        if (result.type === "feed" && result.feed && Array.isArray(result.feed)) {
           renderFeed(result, feedDiv);
-          feedDiv.innerHTML += "<p>Loaded from cache (valid for 24 hours).</p>";
+          feedDiv.innerHTML += "<p>Loaded from cache (valid for 24 hours). Auto-updates every 10 minutes.</p>";
+          startAutoRefresh();
           return;
         } else {
           console.warn("Invalid cached feed structure");
+          localStorage.removeItem("threatFeed"); // Clear corrupted cache
+          localStorage.removeItem("threatFeedTime");
         }
       } catch (err) {
         console.error("Failed to parse cached feed:", err);
+        localStorage.removeItem("threatFeed"); // Clear corrupted cache
+        localStorage.removeItem("threatFeedTime");
       }
     }
+    // No cache, show static feed
+    renderStaticFeed(feedDiv);
+    feedDiv.innerHTML += "<p>Showing sample data. Click 'Refresh Feed' to fetch latest FireHOL/Spamhaus blocklists. Auto-updates every 10 minutes.</p>";
+    startAutoRefresh();
+    return;
   }
 
+  // Fetch combined blocklist on refresh
   try {
     const res = await fetch("/.netlify/functions/fetch-threats");
     console.log("Fetch response status:", res.status);
@@ -38,98 +51,114 @@ async function loadThreatFeed(force = false) {
 
     if (result.error) {
       feedDiv.innerHTML += `<p>Error: ${result.error}. Using cached data if available.</p>`;
-      if (!refresh) {
-        const cachedFeed = localStorage.getItem("threatFeed");
-        if (cachedFeed) {
-          try {
-            const cachedResult = JSON.parse(cachedFeed);
-            if (cachedResult.type === "feed" && cachedResult.feed && cachedResult.feed.data && Array.isArray(cachedResult.feed.data)) {
-              renderFeed(cachedResult, feedDiv);
-              feedDiv.innerHTML += "<p>Showing cached data due to rate limit.</p>";
-            } else {
-              renderPlaceholderFeed(feedDiv);
-              feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
-            }
-          } catch (err) {
-            renderPlaceholderFeed(feedDiv);
-            feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
-            console.error("Failed to parse cached feed on error:", err);
-          }
-        } else {
-          renderPlaceholderFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
-        }
-      }
-      return;
-    }
-
-    if (result.type === "feed" && result.feed && result.feed.data && Array.isArray(result.feed.data)) {
-      localStorage.setItem("threatFeed", JSON.stringify(result));
-      localStorage.setItem("threatFeedTime", Date.now().toString());
-      console.log("Cached new feed:", result);
-      renderFeed(result, feedDiv);
-    } else {
-      feedDiv.innerHTML += `<p>No feed data available: ${result.error || "Unexpected response format"}</p>`;
-      renderPlaceholderFeed(feedDiv);
-    }
-  } catch (err) {
-    feedDiv.innerHTML = `<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Error: ${err.message}. Using cached data if available.</p>`;
-    if (!refresh) {
       const cachedFeed = localStorage.getItem("threatFeed");
       if (cachedFeed) {
         try {
           const cachedResult = JSON.parse(cachedFeed);
-          if (cachedResult.type === "feed" && cachedResult.feed && cachedResult.feed.data && Array.isArray(cachedResult.feed.data)) {
+          if (cachedResult.type === "feed" && cachedResult.feed && Array.isArray(cachedResult.feed)) {
             renderFeed(cachedResult, feedDiv);
-            feedDiv.innerHTML += "<p>Showing cached data due to error.</p>";
+            feedDiv.innerHTML += "<p>Showing cached data due to error. Auto-updates every 10 minutes.</p>";
+            startAutoRefresh();
           } else {
-            renderPlaceholderFeed(feedDiv);
-            feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+            renderStaticFeed(feedDiv);
+            feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
           }
         } catch (err) {
-          renderPlaceholderFeed(feedDiv);
-          feedDiv.innerHTML += "<p>No valid cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+          renderStaticFeed(feedDiv);
+          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
           console.error("Failed to parse cached feed on error:", err);
+          localStorage.removeItem("threatFeed"); // Clear corrupted cache
+          localStorage.removeItem("threatFeedTime");
         }
       } else {
-        renderPlaceholderFeed(feedDiv);
-        feedDiv.innerHTML += "<p>No cached data. Rate limit exceeded (limited to 5 checks/day). Try again after midnight UTC or upgrade your plan at <a href='https://www.abuseipdb.com/pricing'>https://www.abuseipdb.com/pricing</a>.</p>";
+        renderStaticFeed(feedDiv);
+        feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
       }
+      return;
+    }
+
+    if (result.type === "feed" && result.feed && Array.isArray(result.feed)) {
+      localStorage.setItem("threatFeed", JSON.stringify(result));
+      localStorage.setItem("threatFeedTime", Date.now().toString());
+      console.log("Cached new feed:", result);
+      renderFeed(result, feedDiv);
+      feedDiv.innerHTML += "<p>Fetched latest FireHOL/Spamhaus blocklists. Auto-updates every 10 minutes.</p>";
+      startAutoRefresh();
+    } else {
+      feedDiv.innerHTML += `<p>No feed data available: ${result.error || "Unexpected response format"}</p>`;
+      renderStaticFeed(feedDiv);
+    }
+  } catch (err) {
+    feedDiv.innerHTML = `<h2>Latest Malicious IPs</h2><button onclick='refreshFeed()' class='btn'>Refresh Feed</button><p>Error: ${err.message}. Using cached data if available.</p>`;
+    const cachedFeed = localStorage.getItem("threatFeed");
+    if (cachedFeed) {
+      try {
+        const cachedResult = JSON.parse(cachedFeed);
+        if (cachedResult.type === "feed" && cachedResult.feed && Array.isArray(cachedResult.feed)) {
+          renderFeed(cachedResult, feedDiv);
+          feedDiv.innerHTML += "<p>Showing cached data due to error. Auto-updates every 10 minutes.</p>";
+          startAutoRefresh();
+        } else {
+          renderStaticFeed(feedDiv);
+          feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+        }
+      } catch (err) {
+        renderStaticFeed(feedDiv);
+        feedDiv.innerHTML += "<p>No valid cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
+        console.error("Failed to parse cached feed on error:", err);
+        localStorage.removeItem("threatFeed"); // Clear corrupted cache
+        localStorage.removeItem("threatFeedTime");
+      }
+    } else {
+      renderStaticFeed(feedDiv);
+      feedDiv.innerHTML += "<p>No cached data. Failed to fetch FireHOL/Spamhaus blocklists.</p>";
     }
     console.error("Feed fetch error:", err);
   }
 }
 
-function renderFeed(result, feedDiv) {
-  const table = document.createElement("table");
-  const thead = document.createElement("thead");
-  thead.innerHTML = "<tr><th>IP Address</th><th>Abuse Score</th><th>Last Reported</th></tr>";
-  table.appendChild(thead);
-  const tbody = document.createElement("tbody");
-  result.feed.data.forEach(item => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.ipAddress}</td>
-      <td class="${item.abuseConfidenceScore >= 50 ? 'status-malicious' : 'status-clean'}">${item.abuseConfidenceScore}</td>
-      <td>${item.lastReportedAt || "N/A"}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-  feedDiv.appendChild(table);
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => loadThreatFeed(true), 600000); // Refresh every 10 minutes
 }
 
-function renderPlaceholderFeed(feedDiv) {
-  const table = document.createElement("table");
-  const thead = document.createElement("thead");
-  thead.innerHTML = "<tr><th>IP Address</th><th>Abuse Score</th><th>Last Reported</th></tr>";
-  table.appendChild(thead);
-  const tbody = document.createElement("tbody");
-  const tr = document.createElement("tr");
-  tr.innerHTML = `<td colspan="3">Unable to load feed due to API limits. Please try again later.</td>`;
-  tbody.appendChild(tr);
-  table.appendChild(tbody);
-  feedDiv.appendChild(table);
+function renderFeed(result, feedDiv) {
+  const select = document.createElement("select");
+  select.className = "feed-select";
+  select.innerHTML = '<option value="">Select an IP</option>';
+  result.feed.slice(0, 100).forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.ipAddress;
+    option.textContent = `${item.ipAddress} (${item.source})`;
+    select.appendChild(option);
+  });
+  const container = document.createElement("div");
+  container.className = "feed-container";
+  container.appendChild(select);
+  feedDiv.appendChild(container);
+}
+
+function renderStaticFeed(feedDiv) {
+  const select = document.createElement("select");
+  select.className = "feed-select";
+  select.innerHTML = '<option value="">Select an IP</option>';
+  const sampleData = [
+    { ipAddress: "45.146.164.125", status: "Malicious", source: "Sample" },
+    { ipAddress: "118.25.6.39", status: "Malicious", source: "Sample" },
+    { ipAddress: "185.173.35.14", status: "Malicious", source: "Sample" },
+    { ipAddress: "103.196.36.10", status: "Malicious", source: "Sample" }
+  ];
+  sampleData.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.ipAddress;
+    option.textContent = `${item.ipAddress} (${item.source})`;
+    select.appendChild(option);
+  });
+  const container = document.createElement("div");
+  container.className = "feed-container";
+  container.appendChild(select);
+  feedDiv.appendChild(container);
+  feedDiv.innerHTML += "<p>Showing sample data due to unavailability.</p>";
 }
 
 async function refreshFeed() {
