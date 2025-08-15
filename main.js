@@ -1,76 +1,46 @@
 // main.js
+async function loadThreats() {
+  const res = await fetch("/.netlify/functions/fetch-threats");
+  const data = await res.json();
+  displayThreats(data);
+}
 
-const form = document.getElementById("search-form");
-const input = document.getElementById("ioc");
-const resultsDiv = document.getElementById("results");
-const detectedType = document.getElementById("detected-type");
+function displayThreats(data) {
+  const results = document.getElementById("results");
+  results.innerHTML = "";
 
-let threatData = { ips: {}, domains: {}, hashes: {} };
+  // Display IPs
+  const ipList = Object.keys(data.ips);
+  if (ipList.length > 0) {
+    results.innerHTML += `<h2>Malicious IPs</h2><ul>${ipList.map(ip => `<li>${ip}</li>`).join("")}</ul>`;
+  }
 
-// --- FETCH THREAT DATA FROM NETLIFY FUNCTION ---
-async function fetchThreats() {
-  try {
-    const res = await fetch("/.netlify/functions/fetch-threats");
-    threatData = await res.json();
-    displayAllThreats();
-  } catch (err) {
-    resultsDiv.innerHTML = `<p style="color:red">Failed to load threat feed: ${err.message}</p>`;
+  // Display Domains
+  const domainList = Object.keys(data.domains);
+  if (domainList.length > 0) {
+    results.innerHTML += `<h2>Malicious Domains</h2><ul>${domainList.map(d => `<li>${d}</li>`).join("")}</ul>`;
+  }
+
+  // Display Hashes
+  const hashList = Object.keys(data.hashes);
+  if (hashList.length > 0) {
+    results.innerHTML += `<h2>Malicious Hashes</h2><ul>${hashList.map(h => `<li>${h}</li>`).join("")}</ul>`;
   }
 }
 
-// --- DISPLAY ALL THREATS ---
-function displayAllThreats() {
-  let html = "<h2>All Threats</h2>";
-
-  // IPs
-  html += "<h3>Malicious IPs</h3><ul>";
-  for (const ip in threatData.ips) {
-    html += `<li>${ip} - ${threatData.ips[ip]}</li>`;
-  }
-  html += "</ul>";
-
-  // Domains
-  html += "<h3>Malicious Domains</h3><ul>";
-  for (const domain in threatData.domains) {
-    html += `<li>${domain} - ${threatData.domains[domain]}</li>`;
-  }
-  html += "</ul>";
-
-  // Hashes
-  html += "<h3>Malicious Hashes</h3><ul>";
-  for (const hash in threatData.hashes) {
-    html += `<li>${hash} - ${threatData.hashes[hash]}</li>`;
-  }
-  html += "</ul>";
-
-  resultsDiv.innerHTML = html;
-}
-
-// --- SEARCH FUNCTION ---
-form.addEventListener("submit", (e) => {
+// Search form
+document.getElementById("search-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const query = input.value.trim();
-  if (!query) return;
+  const ioc = document.getElementById("ioc").value.trim();
+  const res = await fetch("/.netlify/functions/fetch-threats");
+  const data = await res.json();
 
-  let found = false;
+  let detectedType = "unknown";
+  if (data.ips[ioc]) detectedType = "IP";
+  if (data.domains[ioc]) detectedType = "Domain";
+  if (data.hashes[ioc]) detectedType = "Hash";
 
-  if (threatData.ips[query]) {
-    detectedType.textContent = `IP - ${threatData.ips[query]}`;
-    found = true;
-  } else if (threatData.domains[query]) {
-    detectedType.textContent = `Domain - ${threatData.domains[query]}`;
-    found = true;
-  } else if (threatData.hashes[query]) {
-    detectedType.textContent = `Hash - ${threatData.hashes[query]}`;
-    found = true;
-  } else {
-    detectedType.textContent = "unknown";
-  }
-
-  if (found) {
-    alert(`Threat found: ${query}`);
-  }
+  document.getElementById("detected-type").innerText = detectedType;
 });
 
-// --- INITIAL LOAD ---
-fetchThreats();
+window.onload = loadThreats;
