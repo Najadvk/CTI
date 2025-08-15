@@ -21,3 +21,13 @@ function renderResults(data) {
   document.getElementById("results").innerHTML =
     `<pre>${JSON.stringify(data, null, 2)}</pre>`;
 }
+try {
+  const response = await fetch(`/.netlify/functions/lookup-ip?q=${inputValue}`);
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  const data = await response.json();
+  console.log(data);
+  resultDiv.textContent = JSON.stringify(data, null, 2);
+} catch (err) {
+  console.error(err);
+  resultDiv.textContent = `Error: ${err.message}`;
+}
