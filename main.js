@@ -14,9 +14,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const sources = {
-    ip: ["abuseipdb", "virustotal", "otx", "threatfox"],
-    domain: ["virustotal", "otx", "threatfox"],
-    hash: ["virustotal", "otx", "threatfox"]
+    ip: ["virustotal"],
+    domain: ["virustotal"],
+    hash: ["virustotal"]
   };
 
   // Map status to color
@@ -43,16 +43,20 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(`Fetching: ${url}`);
     for (let i = 0; i < retries; i++) {
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, { method: 'GET' });
         if (res.ok) {
           const data = await res.json();
-          console.log(`Raw response from ${url}:`, data);
+          console.log(`Raw response from ${url}:`, JSON.stringify(data, null, 2));
           return data;
         }
+        console.error(`HTTP error from ${url}: ${res.status}`);
         throw new Error(`HTTP ${res.status}`);
       } catch (err) {
         console.error(`Attempt ${i + 1} failed for ${url}:`, err.message);
-        if (i === retries - 1) return { error: err.message };
+        if (i === retries - 1) {
+          console.error(`All retries failed for ${url}`);
+          return { error: err.message };
+        }
       }
     }
   }
@@ -71,4 +75,90 @@ document.addEventListener("DOMContentLoaded", () => {
       summary += `Likely malicious (${maliciousCount}/${results.length} sources).`;
     } else if (cleanCount > maliciousCount && cleanCount > 0) {
       summary += `Likely safe (${cleanCount}/${results.length} sources).`;
-    } else if (unknown
+    } else if (unknownCount > 0) {
+      summary += `Inconclusive (${unknownCount}/${results.length} sources).`;
+    } else if (errorCount === results.length) {
+      summary += "All sources failed; check API setup or try again.";
+    } else {
+      summary += "Mixed results; review details.";
+    }
+    return summary;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    console.log("Form submitted with IOC:", input.value);
+    const ioc = input.value.trim();
+
+    if (!ioc) {
+      console.warn("Empty IOC input");
+      resultDiv.innerHTML = "<p>Please enter an IOC.</p>";
+      detectedTypeSpan.innerText = "";
+      summaryDiv.innerText = "";
+      return;
+    }
+
+    const type = detectIOC(ioc);
+    detectedTypeSpan.innerText = type || "unknown";
+    console.log("Detected IOC type:", type);
+
+    if (!type) {
+      resultDiv.innerHTML = "<p>Invalid IOC format. Enter a valid IP, domain, or hash.</p>";
+      summaryDiv.innerText = "";
+      return;
+    }
+
+    let tableHTML = `<table class="source-table">
+      <thead>
+        <tr><th>Source</th><th>Status</th><th>Details</th></tr>
+      </thead>
+      <tbody>`;
+    sources[type].forEach(src => {
+      const sourceName = { virustotal: "VirusTotal" }[src] || src;
+      tableHTML += `<tr id="row-${src}">
+        <td>${sourceName}</td>
+        <td style="color: gray;">Loading...</td>
+        <td>-</td>
+      </tr>`;
+    });
+    tableHTML += "</tbody></table>";
+    resultDiv.innerHTML = tableHTML;
+    summaryDiv.innerText = "Fetching results...";
+
+    const fetchPromises = sources[type].map(async (source) => {
+      const url = `/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`;
+      const data = await fetchWithRetry(url);
+      const row = document.getElementById(`row-${source}`);
+      if (!row) {
+        console.error(`Row for ${source} not found`);
+        return { source, status: "Error", details: "Row not found" };
+      }
+
+      let statusText, detailsText;
+      if (data.error) {
+        statusText = "Error";
+        detailsText = data.error;
+      } else if (data.status) {
+        statusText = data.status;
+        detailsText = data.details || "No details available";
+      } else {
+        statusText = "Unknown";
+        detailsText = "No data returned";
+      }
+
+      row.cells[1].innerText = statusText;
+      row.cells[1].style.color = getStatusColor(statusText);
+      row.cells[2].innerText = detailsText;
+
+      return { source, status: statusText, details: detailsText };
+    });
+
+    try {
+      const results = await Promise.all(fetchPromises);
+      summaryDiv.innerText = summarizeResults(results);
+    } catch (err) {
+      console.error("Error in fetch promises:", err);
+      summaryDiv.innerText = "Error fetching results; check console for details.";
+    }
+  });
+});
