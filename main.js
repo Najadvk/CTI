@@ -2,13 +2,13 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("Main.js loaded, DOM ready");
   const form = document.getElementById("search-form");
   const input = document.getElementById("ioc");
-  const resultDiv = document.querySelector(".results");
-  const detectedTypeSpan = document.querySelector(".detected");
+  const resultDiv = document.getElementById("results");
+  const detectedTypeP = document.getElementById("detected-type");
   const summaryDiv = document.getElementById("summary");
 
   // Verify DOM elements
-  if (!form || !input || !resultDiv || !detectedTypeSpan || !summaryDiv) {
-    console.error("Missing DOM elements:", { form, input, resultDiv, detectedTypeSpan, summaryDiv });
+  if (!form || !input || !resultDiv || !detectedTypeP || !summaryDiv) {
+    console.error("Missing DOM elements:", { form, input, resultDiv, detectedTypeP, summaryDiv });
     resultDiv.innerHTML = "<p>Error: Required HTML elements missing. Check index.html.</p>";
     return;
   }
@@ -93,13 +93,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!ioc) {
       console.warn("Empty IOC input");
       resultDiv.innerHTML = "<p>Please enter an IOC.</p>";
-      detectedTypeSpan.innerText = "";
+      detectedTypeP.innerText = "Detected: unknown";
       summaryDiv.innerText = "";
       return;
     }
 
     const type = detectIOC(ioc);
-    detectedTypeSpan.innerText = type || "unknown";
+    detectedTypeP.innerText = `Detected: ${type || "unknown"}`;
     console.log("Detected IOC type:", type);
 
     if (!type) {
