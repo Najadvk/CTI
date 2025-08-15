@@ -3,11 +3,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("ioc");
   const resultDiv = document.getElementById("results");
   const detectedTypeDiv = document.getElementById("detected-type");
+  const summaryDiv = document.getElementById("summary");
 
   const sources = {
-    ip: ["abuseipdb", "virustotal", "talos"],
-    domain: ["virustotal", "talos"],
-    hash: ["virustotal"]
+    ip: ["abuseipdb", "virustotal", "talos", "xforce"],
+    domain: ["virustotal", "talos", "xforce"],
+    hash: ["virustotal", "hybridanalysis"]
   };
 
   // Helper to map status to color
@@ -19,13 +20,62 @@ document.addEventListener("DOMContentLoaded", () => {
     return "black";
   }
 
+  // Strict IOC detection
+  function detectIOC(ioc) {
+    // IPv4 address (0-255 per octet)
+    if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ioc)) return "ip";
+    // Domain (e.g., example.com, sub.example.co.uk)
+    if (/^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(ioc)) return "domain";
+    // Hash (MD5: 32 chars, SHA-1: 40 chars, SHA-256: 64 chars)
+    if (/^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/.test(ioc)) return "hash";
+    return null;
+  }
+
+  // Fetch with retry logic
+  async function fetchWithRetry(url, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) return await res.json();
+        throw new Error(`HTTP ${res.status}`);
+      } catch (err) {
+        if (i === retries - 1) return { error: err.message };
+      }
+    }
+  }
+
+  // Summarize results for decision-making
+  function summarizeResults(results) {
+    const statuses = results.map(r => r.status.toLowerCase());
+    const maliciousCount = statuses.filter(s => s.includes("malicious")).length;
+    const cleanCount = statuses.filter(s => s.includes("clean") || s.includes("safe") || s.includes("ok")).length;
+    const unknownCount = statuses.filter(s => s.includes("unknown") || s.includes("suspicious")).length;
+    const errorCount = statuses.filter(s => s.includes("error")).length;
+
+    let summary = "Summary: ";
+    if (maliciousCount > cleanCount && maliciousCount > 0) {
+      summary += `Likely malicious (${maliciousCount}/${results.length} sources report malicious).`;
+    } else if (cleanCount > maliciousCount && cleanCount > 0) {
+      summary += `Likely safe (${cleanCount}/${results.length} sources report clean/safe).`;
+    } else if (unknownCount > 0) {
+      summary += `Inconclusive (${unknownCount}/${results.length} sources report unknown/suspicious).`;
+    } else if (errorCount === results.length) {
+      summary += "All sources failed; try again later.";
+    } else {
+      summary += "Mixed results; review details for context.";
+    }
+    return summary;
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const ioc = input.value.trim();
 
+    // Input validation
     if (!ioc) {
       resultDiv.innerHTML = "<p>Please enter an IOC.</p>";
       detectedTypeDiv.textContent = "";
+      summaryDiv.textContent = "";
       return;
     }
 
@@ -33,7 +83,8 @@ document.addEventListener("DOMContentLoaded", () => {
     detectedTypeDiv.textContent = type || "unknown";
 
     if (!type) {
-      resultDiv.innerHTML = "<p>Unable to detect IOC type.</p>";
+      resultDiv.innerHTML = "<p>Invalid IOC format. Please enter a valid IP, domain, or hash.</p>";
+      summaryDiv.textContent = "";
       return;
     }
 
@@ -52,20 +103,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     tableHTML += "</tbody></table>";
     resultDiv.innerHTML = tableHTML;
+    summaryDiv.textContent = "Fetching results...";
 
-    // Fetch from all sources in parallel
-    sources[type].forEach(async (source) => {
+    // Fetch from all sources in parallel and store results
+    const fetchPromises = sources[type].map(async (source) => {
       try {
-        const res = await fetch(`/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`);
-        let data;
-        if (res.ok) {
-          data = await res.json();
-        } else {
-          data = { error: `HTTP ${res.status}` };
-        }
-
+        const data = await fetchWithRetry(`/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`);
         const row = document.getElementById(`row-${source}`);
-        if (!row) return;
+        if (!row) return { source, status: "Error", details: "Row not found" };
 
         let statusText, detailsText;
         if (data.error) {
@@ -83,6 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
         row.cells[1].style.color = getStatusColor(statusText);
         row.cells[2].textContent = detailsText;
 
+        return { source, status: statusText, details: detailsText };
       } catch (err) {
         const row = document.getElementById(`row-${source}`);
         if (row) {
@@ -90,10 +136,12 @@ document.addEventListener("DOMContentLoaded", () => {
           row.cells[1].style.color = "red";
           row.cells[2].textContent = err.message;
         }
+        return { source, status: "Error", details: err.message };
       }
     });
-  });
 
-  function detectIOC(ioc) {
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
-    if (/^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|
+    // Update summary after all fetches complete
+    const results = await Promise.all(fetchPromises);
+    summaryDiv.textContent = summarizeResults(results);
+  });
+});
