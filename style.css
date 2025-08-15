@@ -1,103 +1,166 @@
 body {
-  font-family: Arial, sans-serif;
-  background-color: #0d0d0d;
-  color: #e0e0e0;
+  font-family: 'Roboto', sans-serif;
+  background-color: #1e2a44;
+  color: #e6ecf0;
   margin: 0;
   padding: 0;
 }
 
-.container {
-  max-width: 900px;
-  margin: 40px auto;
+.header {
+  background-color: #0f172a;
   padding: 20px;
-  background-color: #1a1a1a;
-  border-radius: 8px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
+  text-align: center;
+  border-bottom: 2px solid #00aaff;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.logo-img {
+  width: 40px;
+  height: 40px;
+  display: none; /* Show when logo.png is added */
 }
 
 .header h1 {
   margin: 0;
+  font-size: 24px;
   color: #ffffff;
 }
 
-.sub {
-  color: #888888;
+.tagline {
+  margin: 5px 0 0;
+  color: #a1b2c3;
+  font-size: 16px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+}
+
+.search-section, .threat-feeds {
+  background-color: #2a3b5c;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.search-section h2, .threat-feeds h2 {
+  margin: 0 0 10px;
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.search-section p, .threat-feeds p {
+  margin: 0 0 15px;
+  color: #a1b2c3;
+  font-size: 14px;
 }
 
 .search {
-  margin: 20px 0;
   display: flex;
+  gap: 10px;
 }
 
 .input {
   flex: 1;
   padding: 10px;
-  border-radius: 5px 0 0 5px;
-  border: 1px solid #333333;
-  background-color: #252525;
-  color: #e0e0e0;
+  border-radius: 4px;
+  border: 1px solid #3b4a6b;
+  background-color: #334466;
+  color: #e6ecf0;
+  font-size: 14px;
 }
 
 .input::placeholder {
-  color: #666666;
+  color: #7b8aa6;
 }
 
 .btn {
   padding: 10px 20px;
   border: none;
-  border-radius: 0 5px 5px 0;
-  background-color: #b71c1c;
+  border-radius: 4px;
+  background-color: #00aaff;
   color: #ffffff;
   cursor: pointer;
+  font-size: 14px;
   transition: background-color 0.2s;
 }
 
 .btn:hover {
-  background-color: #8e0000;
+  background-color: #0088cc;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
+.feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
-th, td {
-  padding: 12px;
-  border-bottom: 1px solid #2a2a2a;
-  text-align: left;
+.feed-item {
+  background-color: #334466;
+  padding: 15px;
+  border-radius: 6px;
 }
 
-th {
-  background-color: #252525;
+.feed-item h3 {
+  margin: 0 0 10px;
   color: #ffffff;
-}
-
-.status-malicious {
-  color: #ff4d4d;
-  font-weight: bold;
-}
-
-.status-clean {
-  color: #4caf50;
-  font-weight: bold;
-}
-
-.feed-container {
-  margin-top: 20px;
+  font-size: 16px;
 }
 
 .feed-select {
   width: 100%;
   padding: 10px;
-  border-radius: 5px;
-  border: 1px solid #333333;
-  background-color: #252525;
-  color: #e0e0e0;
-  font-size: 16px;
+  border-radius: 4px;
+  border: 1px solid #3b4a6b;
+  background-color: #2a3b5c;
+  color: #e6ecf0;
+  font-size: 14px;
 }
 
 .feed-select option {
-  background-color: #252525;
-  color: #e0e0e0;
+  background-color: #2a3b5c;
+  color: #e6ecf0;
+}
+
+#feedStatus {
+  font-size: 12px;
+  color: #a1b2c3;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #3b4a6b;
+  text-align: left;
+  font-size: 14px;
+}
+
+th {
+  background-color: #2a3b5c;
+  color: #ffffff;
+}
+
+.status-malicious {
+  color: #ff4d4d;
+  font-weight: 500;
+}
+
+.status-clean {
+  color: #00cc00;
+  font-weight: 500;
 }
