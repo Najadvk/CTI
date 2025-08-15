@@ -4,7 +4,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultDiv = document.getElementById("results");
   const detectedTypeDiv = document.getElementById("detected-type");
 
-  // Define sources for each IOC type
   const sources = {
     ip: ["abuseipdb", "virustotal", "talos"],
     domain: ["virustotal", "talos"],
@@ -29,23 +28,57 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    resultDiv.innerHTML = "<p>Loading...</p>";
+    // Initialize table with loading placeholders
+    let tableHTML = `<table border="1" cellpadding="5" cellspacing="0">
+      <thead>
+        <tr><th>Source</th><th>Status</th><th>Details</th></tr>
+      </thead>
+      <tbody>`;
+    sources[type].forEach(src => {
+      tableHTML += `<tr id="row-${src}">
+        <td>${src}</td>
+        <td>Loading...</td>
+        <td>-</td>
+      </tr>`;
+    });
+    tableHTML += "</tbody></table>";
+    resultDiv.innerHTML = tableHTML;
 
-    try {
-      // Fetch from all sources in parallel
-      const fetchPromises = sources[type].map(source =>
-        fetch(`/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`)
-          .then(res => res.ok ? res.json() : { error: `HTTP ${res.status}` })
-          .then(data => ({ source, value: data }))
-          .catch(err => ({ source, value: `Error: ${err.message}` }))
-      );
+    // Fetch from all sources in parallel
+    sources[type].forEach(async (source) => {
+      try {
+        const res = await fetch(`/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`);
+        let data;
+        if (res.ok) {
+          data = await res.json();
+        } else {
+          data = { error: `HTTP ${res.status}` };
+        }
 
-      const results = await Promise.all(fetchPromises);
-      renderTable(results);
-    } catch (err) {
-      console.error(err);
-      resultDiv.innerHTML = `<p>Error: ${err.message}</p>`;
-    }
+        const row = document.getElementById(`row-${source}`);
+        if (!row) return;
+
+        // Map returned data to user-friendly display
+        if (data.error) {
+          row.cells[1].textContent = "Error";
+          row.cells[2].textContent = data.error;
+        } else if (data.status) {
+          row.cells[1].textContent = data.status;
+          row.cells[2].textContent = data.details || JSON.stringify(data);
+        } else {
+          // Fallback for unknown structure
+          row.cells[1].textContent = "OK";
+          row.cells[2].textContent = JSON.stringify(data);
+        }
+
+      } catch (err) {
+        const row = document.getElementById(`row-${source}`);
+        if (row) {
+          row.cells[1].textContent = "Error";
+          row.cells[2].textContent = err.message;
+        }
+      }
+    });
   });
 
   function detectIOC(ioc) {
@@ -53,31 +86,5 @@ document.addEventListener("DOMContentLoaded", () => {
     if (/^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/.test(ioc)) return "hash";
     if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ioc)) return "domain";
     return null;
-  }
-
-  function renderTable(results) {
-    if (!results || results.length === 0) {
-      resultDiv.innerHTML = "<p>No data found.</p>";
-      return;
-    }
-
-    let table = `<table border="1" cellpadding="5" cellspacing="0">
-      <thead>
-        <tr>
-          <th>Source</th>
-          <th>Result</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    results.forEach(r => {
-      table += `<tr>
-        <td>${r.source}</td>
-        <td>${typeof r.value === "object" ? JSON.stringify(r.value, null, 2) : r.value}</td>
-      </tr>`;
-    });
-
-    table += "</tbody></table>";
-    resultDiv.innerHTML = table;
   }
 });
