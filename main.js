@@ -1,28 +1,26 @@
-console.log("Main.js: Script loaded (v3.0)");
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Main.js: DOMContentLoaded fired");
   const form = document.getElementById("search-form");
   const input = document.getElementById("ioc");
   const resultDiv = document.getElementById("results");
-  const detectedTypeP = document.getElementById("detected-type");
+  const detectedTypeSpan = document.querySelector(".detected");
   const summaryDiv = document.getElementById("summary");
   const errorDiv = document.getElementById("error");
 
-  // Log DOM elements individually
-  console.log("Main.js: DOM element - search-form:", !!form);
-  console.log("Main.js: DOM element - ioc:", !!input);
-  console.log("Main.js: DOM element - results:", !!resultDiv);
-  console.log("Main.js: DOM element - detected-type:", !!detectedTypeP);
-  console.log("Main.js: DOM element - summary:", !!summaryDiv);
-  console.log("Main.js: DOM element - error:", !!errorDiv);
+  // Debug each DOM element
+  console.log("Main.js: Checking DOM - search-form:", !!form);
+  console.log("Main.js: Checking DOM - ioc:", !!input);
+  console.log("Main.js: Checking DOM - results:", !!resultDiv);
+  console.log("Main.js: Checking DOM - detected:", !!detectedTypeSpan);
+  console.log("Main.js: Checking DOM - summary:", !!summaryDiv);
+  console.log("Main.js: Checking DOM - error:", !!errorDiv);
 
-  // Check DOM elements
-  if (!form || !input || !resultDiv || !detectedTypeP || !summaryDiv) {
+  if (!form || !input || !resultDiv || !detectedTypeSpan || !summaryDiv) {
     console.error("Main.js: Missing DOM elements:", {
       "search-form": !!form,
       "ioc": !!input,
       "results": !!resultDiv,
-      "detected-type": !!detectedTypeP,
+      "detected": !!detectedTypeSpan,
       "summary": !!summaryDiv
     });
     if (resultDiv) {
@@ -43,7 +41,6 @@ document.addEventListener("DOMContentLoaded", () => {
     hash: ["virustotal"]
   };
 
-  // Map status to color
   function getStatusColor(status) {
     status = String(status).toLowerCase();
     if (status.includes("malicious") || status === "error") return "red";
@@ -52,7 +49,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return "black";
   }
 
-  // IOC detection
   function detectIOC(ioc) {
     console.log("Main.js: Detecting IOC:", ioc);
     if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ioc)) return "ip";
@@ -62,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
-  // Fetch with retry
   async function fetchWithRetry(url, retries = 2) {
     console.log(`Main.js: Fetching ${url}`);
     for (let i = 0; i < retries; i++) {
@@ -85,7 +80,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Summarize results
   function summarizeResults(results) {
     console.log("Main.js: Summarizing results:", results);
     const statuses = results.map(r => r.status.toLowerCase());
@@ -117,72 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!ioc) {
       console.warn("Main.js: Empty IOC input");
       resultDiv.innerHTML = "<p>Please enter an IOC.</p>";
-      detectedTypeP.innerText = "Detected: unknown";
+      detectedTypeSpan.innerText = "unknown";
       summaryDiv.innerText = "";
       return;
-    }
-
-    const type = detectIOC(ioc);
-    detectedTypeP.innerText = `Detected: ${type || "unknown"}`;
-    console.log("Main.js: Detected IOC type:", type);
-
-    if (!type) {
-      resultDiv.innerHTML = "<p>Invalid IOC format. Enter a valid IP, domain, or hash.</p>";
-      summaryDiv.innerText = "";
-      return;
-    }
-
-    let tableHTML = `<table class="source-table">
-      <thead>
-        <tr><th>Source</th><th>Status</th><th>Details</th></tr>
-      </thead>
-      <tbody>`;
-    sources[type].forEach(src => {
-      const sourceName = { virustotal: "VirusTotal" }[src] || src;
-      tableHTML += `<tr id="row-${src}">
-        <td>${sourceName}</td>
-        <td style="color: gray;">Loading...</td>
-        <td>-</td>
-      </tr>`;
-    });
-    tableHTML += "</tbody></table>";
-    resultDiv.innerHTML = tableHTML;
-    summaryDiv.innerText = "Fetching results...";
-
-    const fetchPromises = sources[type].map(async (source) => {
-      const url = `/.netlify/functions/lookup-${source}?q=${encodeURIComponent(ioc)}`;
-      const data = await fetchWithRetry(url);
-      const row = document.getElementById(`row-${source}`);
-      if (!row) {
-        console.error(`Main.js: Row for ${source} not found`);
-        return { source, status: "Error", details: "Row not found" };
-      }
-
-      let statusText, detailsText;
-      if (data.error) {
-        statusText = "Error";
-        detailsText = data.error;
-      } else if (data.status) {
-        statusText = data.status;
-        detailsText = data.details || "No details available";
-      } else {
-        statusText = "Unknown";
-        detailsText = "No data returned";
-      }
-
-      row.cells[1].innerText = statusText;
-      row.cells[1].style.color = getStatusColor(statusText);
-      row.cells[2].innerText = detailsText;
-
-      return { source, status: statusText, details: detailsText };
-    });
-
-    try {
-      const results = await Promise.all(fetchPromises);
-      summaryDiv.innerText = summarizeResults(results);
-    } catch (err) {
-      console.error("Main.js: Error in fetch promises:", err);
-      summaryDiv.innerText = "Error fetching results; check console for details.";
-    }
-  });
-});
