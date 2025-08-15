@@ -1,46 +1,33 @@
 // main.js
-async function loadThreats() {
-  const res = await fetch("/.netlify/functions/fetch-threats");
-  const data = await res.json();
-  displayThreats(data);
-}
-
-function displayThreats(data) {
-  const results = document.getElementById("results");
-  results.innerHTML = "";
-
-  // Display IPs
-  const ipList = Object.keys(data.ips);
-  if (ipList.length > 0) {
-    results.innerHTML += `<h2>Malicious IPs</h2><ul>${ipList.map(ip => `<li>${ip}</li>`).join("")}</ul>`;
-  }
-
-  // Display Domains
-  const domainList = Object.keys(data.domains);
-  if (domainList.length > 0) {
-    results.innerHTML += `<h2>Malicious Domains</h2><ul>${domainList.map(d => `<li>${d}</li>`).join("")}</ul>`;
-  }
-
-  // Display Hashes
-  const hashList = Object.keys(data.hashes);
-  if (hashList.length > 0) {
-    results.innerHTML += `<h2>Malicious Hashes</h2><ul>${hashList.map(h => `<li>${h}</li>`).join("")}</ul>`;
-  }
-}
-
-// Search form
 document.getElementById("search-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+
   const ioc = document.getElementById("ioc").value.trim();
-  const res = await fetch("/.netlify/functions/fetch-threats");
-  const data = await res.json();
+  if (!ioc) return;
 
-  let detectedType = "unknown";
-  if (data.ips[ioc]) detectedType = "IP";
-  if (data.domains[ioc]) detectedType = "Domain";
-  if (data.hashes[ioc]) detectedType = "Hash";
+  document.getElementById("results").innerHTML = "<p>Loading...</p>";
 
-  document.getElementById("detected-type").innerText = detectedType;
+  try {
+    const res = await fetch(`/.netlify/functions/fetch-threats?query=${ioc}`);
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById("results").innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
+      return;
+    }
+
+    // AbuseIPDB response
+    const d = data.data;
+    document.getElementById("results").innerHTML = `
+      <h3>Results for ${d.ipAddress}</h3>
+      <p><strong>Abuse Confidence Score:</strong> ${d.abuseConfidenceScore}</p>
+      <p><strong>Total Reports:</strong> ${d.totalReports}</p>
+      <p><strong>Last Reported At:</strong> ${d.lastReportedAt || "Never"}</p>
+      <p><strong>Usage Type:</strong> ${d.usageType || "Unknown"}</p>
+      <p><strong>ISP:</strong> ${d.isp || "Unknown"}</p>
+      <p><strong>Country:</strong> ${d.countryCode || "Unknown"}</p>
+    `;
+  } catch (err) {
+    document.getElementById("results").innerHTML = `<p style="color:red;">${err.message}</p>`;
+  }
 });
-
-window.onload = loadThreats;
