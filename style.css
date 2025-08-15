@@ -1,7 +1,7 @@
 body {
   font-family: Arial, sans-serif;
-  background-color: #0d0d0d; /* Darker charcoal background */
-  color: #e0e0e0; /* Light gray for text readability */
+  background-color: #0d0d0d;
+  color: #e0e0e0;
   margin: 0;
   padding: 0;
 }
@@ -10,18 +10,18 @@ body {
   max-width: 900px;
   margin: 40px auto;
   padding: 20px;
-  background-color: #1a1a1a; /* Darker container background */
+  background-color: #1a1a1a;
   border-radius: 8px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7); /* Subtle shadow for depth */
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
 }
 
 .header h1 {
   margin: 0;
-  color: #ffffff; /* Pure white for emphasis */
+  color: #ffffff;
 }
 
 .sub {
-  color: #888888; /* Darker gray for subtitle */
+  color: #888888;
 }
 
 .search {
@@ -33,81 +33,27 @@ body {
   flex: 1;
   padding: 10px;
   border-radius: 5px 0 0 5px;
-  border: 1px solid #333333; /* Dark border */
-  background-color: #252525; /* Dark input background */
-  color: #e0e0e0; /* Light text */
+  border: 1px solid #333333;
+  background-color: #252525;
+  color: #e0e0e0;
 }
 
 .input::placeholder {
-  color: #666666; /* Dim placeholder */
+  color: #666666;
 }
 
 .btn {
   padding: 10px 20px;
   border: none;
   border-radius: 0 5px 5px 0;
-  background-color: #b71c1c; /* Darker red for buttonස
-
-System: I'm sorry, but it seems your message was cut off. You requested a darker theme for your web app, and I've provided the updated `style.css` with a darker color scheme. Below, I'll complete the response by including all necessary files for your Netlify project, ensuring the darker theme is applied consistently. The `style.css` has been modified with darker colors (charcoal background, deeper reds, and high-contrast text) while maintaining usability. The other files (`index.html`, `main.js`, `fetch-threats.js`, `netlify.toml`, `package.json`) are unchanged from the previous functional version, as they don't need theme-related updates. These files are included for completeness, so you can copy-paste them directly into your Netlify project. Ensure the `ABUSEIPDB_API_KEY` environment variable is set in Netlify's dashboard (Site Settings > Environment Variables).
-
-### style.css (Updated with Darker Theme)
-<xaiArtifact artifact_id="f7b48748-90c8-4c58-96ba-676d6a193336" artifact_version_id="136d19e2-0dcf-44f9-8df3-10041fab0b5d" title="style.css" contentType="text/css">
-body {
-  font-family: Arial, sans-serif;
-  background-color: #0d0d0d; /* Darker charcoal background */
-  color: #e0e0e0; /* Light gray for text readability */
-  margin: 0;
-  padding: 0;
-}
-
-.container {
-  max-width: 900px;
-  margin: 40px auto;
-  padding: 20px;
-  background-color: #1a1a1a; /* Darker container background */
-  border-radius: 8px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7); /* Subtle shadow for depth */
-}
-
-.header h1 {
-  margin: 0;
-  color: #ffffff; /* Pure white for emphasis */
-}
-
-.sub {
-  color: #888888; /* Darker gray for subtitle */
-}
-
-.search {
-  margin: 20px 0;
-  display: flex;
-}
-
-.input {
-  flex: 1;
-  padding: 10px;
-  border-radius: 5px 0 0 5px;
-  border: 1px solid #333333; /* Dark border */
-  background-color: #252525; /* Dark input background */
-  color: #e0e0e0; /* Light text */
-}
-
-.input::placeholder {
-  color: #666666; /* Dim placeholder */
-}
-
-.btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 0 5px 5px 0;
-  background-color: #b71c1c; /* Darker red for button */
+  background-color: #b71c1c;
   color: #ffffff;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .btn:hover {
-  background-color: #8e0000; /* Even darker red on hover */
+  background-color: #8e0000;
 }
 
 table {
@@ -118,21 +64,40 @@ table {
 
 th, td {
   padding: 12px;
-  border-bottom: 1px solid #2a2a2a; /* Darker border for table */
+  border-bottom: 1px solid #2a2a2a;
   text-align: left;
 }
 
 th {
-  background-color: #252525; /* Dark header background */
+  background-color: #252525;
   color: #ffffff;
 }
 
 .status-malicious {
-  color: #ff4d4d; /* Bright red for malicious status */
+  color: #ff4d4d;
   font-weight: bold;
 }
 
 .status-clean {
-  color: #4caf50; /* Green for clean status */
+  color: #4caf50;
   font-weight: bold;
+}
+
+.feed-container {
+  margin-top: 20px;
+}
+
+.feed-select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #333333;
+  background-color: #252525;
+  color: #e0e0e0;
+  font-size: 16px;
+}
+
+.feed-select option {
+  background-color: #252525;
+  color: #e0e0e0;
 }
