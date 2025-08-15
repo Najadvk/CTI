@@ -4,9 +4,9 @@ import fetch from "node-fetch";
 export async function handler(event) {
   try {
     const apiKey = process.env.ABUSEIPDB_API_KEY;
-
-    // If a search query (IP) exists, check that IP
     const params = event.queryStringParameters;
+
+    // Lookup specific IP
     if (params && params.ip) {
       const res = await fetch(`https://api.abuseipdb.com/api/v2/check?ipAddress=${params.ip}`, {
         headers: { Key: apiKey, Accept: "application/json" },
@@ -16,8 +16,8 @@ export async function handler(event) {
       return { statusCode: 200, body: JSON.stringify({ type: "lookup", data }) };
     }
 
-    // Otherwise, fetch the latest reports (feed)
-    const res = await fetch("https://api.abuseipdb.com/api/v2/reports?limit=10", {
+    // Fetch latest blacklist (feed)
+    const res = await fetch("https://api.abuseipdb.com/api/v2/blacklist?confidenceMinimum=90&limit=10", {
       headers: { Key: apiKey, Accept: "application/json" },
     });
     if (!res.ok) throw new Error(`HTTP error! ${res.status}`);
