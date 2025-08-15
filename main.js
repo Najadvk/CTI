@@ -10,6 +10,15 @@ document.addEventListener("DOMContentLoaded", () => {
     hash: ["virustotal"]
   };
 
+  // Helper to map status to color
+  function getStatusColor(status) {
+    status = String(status).toLowerCase();
+    if (status.includes("malicious") || status.includes("bad") || status === "error") return "red";
+    if (status.includes("suspicious") || status.includes("unknown")) return "orange";
+    if (status.includes("clean") || status.includes("ok") || status === "safe") return "green";
+    return "black";
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const ioc = input.value.trim();
@@ -37,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sources[type].forEach(src => {
       tableHTML += `<tr id="row-${src}">
         <td>${src}</td>
-        <td>Loading...</td>
+        <td style="color: gray;">Loading...</td>
         <td>-</td>
       </tr>`;
     });
@@ -58,23 +67,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const row = document.getElementById(`row-${source}`);
         if (!row) return;
 
-        // Map returned data to user-friendly display
+        let statusText, detailsText;
         if (data.error) {
-          row.cells[1].textContent = "Error";
-          row.cells[2].textContent = data.error;
+          statusText = "Error";
+          detailsText = data.error;
         } else if (data.status) {
-          row.cells[1].textContent = data.status;
-          row.cells[2].textContent = data.details || JSON.stringify(data);
+          statusText = data.status;
+          detailsText = data.details || JSON.stringify(data);
         } else {
-          // Fallback for unknown structure
-          row.cells[1].textContent = "OK";
-          row.cells[2].textContent = JSON.stringify(data);
+          statusText = "OK";
+          detailsText = JSON.stringify(data);
         }
+
+        row.cells[1].textContent = statusText;
+        row.cells[1].style.color = getStatusColor(statusText);
+        row.cells[2].textContent = detailsText;
 
       } catch (err) {
         const row = document.getElementById(`row-${source}`);
         if (row) {
           row.cells[1].textContent = "Error";
+          row.cells[1].style.color = "red";
           row.cells[2].textContent = err.message;
         }
       }
@@ -83,8 +96,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function detectIOC(ioc) {
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
-    if (/^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/.test(ioc)) return "hash";
-    if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ioc)) return "domain";
-    return null;
-  }
-});
+    if (/^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|
