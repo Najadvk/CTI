@@ -62,3 +62,29 @@ body {
   padding: 15px;
   border-radius: 5px;
 }
+
+.source-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.source-table th, .source-table td {
+  padding: 10px;
+  border: 1px solid #333;
+  text-align: left;
+}
+
+.source-table th {
+  background: #2a2a2a;
+  font-weight: bold;
+}
+
+.source-table th:first-child {
+  width: 20%;
+  font-size: 1.1em;
+}
+
+.source-table td:first-child {
+  font-weight: bold;
+  color: #0ff;
+}
