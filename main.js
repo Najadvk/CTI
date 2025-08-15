@@ -1,69 +1,76 @@
-const tableBody = document.querySelector('#threat-table tbody');
-const searchInput = document.querySelector('#ioc');
-const searchForm = document.querySelector('#search-form');
+// main.js
 
-let threatData = {};
+const form = document.getElementById("search-form");
+const input = document.getElementById("ioc");
+const resultsDiv = document.getElementById("results");
+const detectedType = document.getElementById("detected-type");
 
-// Fetch threat feed from Netlify function
-async function fetchThreatFeed() {
+let threatData = { ips: {}, domains: {}, hashes: {} };
+
+// --- FETCH THREAT DATA FROM NETLIFY FUNCTION ---
+async function fetchThreats() {
   try {
-    const response = await fetch('/.netlify/functions/fetch-threats');
-    threatData = await response.json();
-    displayTable(threatData);
-  } catch (error) {
-    console.error('Failed to fetch threat feed:', error);
-    tableBody.innerHTML = '<tr><td colspan="3">Failed to load threat feed</td></tr>';
+    const res = await fetch("/.netlify/functions/fetch-threats");
+    threatData = await res.json();
+    displayAllThreats();
+  } catch (err) {
+    resultsDiv.innerHTML = `<p style="color:red">Failed to load threat feed: ${err.message}</p>`;
   }
 }
 
-// Display table rows
-function displayTable(data) {
-  tableBody.innerHTML = '';
-  for (const [ip, status] of Object.entries(data.ips || {})) {
-    addRow('IP', ip, status);
+// --- DISPLAY ALL THREATS ---
+function displayAllThreats() {
+  let html = "<h2>All Threats</h2>";
+
+  // IPs
+  html += "<h3>Malicious IPs</h3><ul>";
+  for (const ip in threatData.ips) {
+    html += `<li>${ip} - ${threatData.ips[ip]}</li>`;
   }
-  for (const [domain, status] of Object.entries(data.domains || {})) {
-    addRow('Domain', domain, status);
+  html += "</ul>";
+
+  // Domains
+  html += "<h3>Malicious Domains</h3><ul>";
+  for (const domain in threatData.domains) {
+    html += `<li>${domain} - ${threatData.domains[domain]}</li>`;
   }
-  for (const [hash, status] of Object.entries(data.hashes || {})) {
-    addRow('Hash', hash, status);
+  html += "</ul>";
+
+  // Hashes
+  html += "<h3>Malicious Hashes</h3><ul>";
+  for (const hash in threatData.hashes) {
+    html += `<li>${hash} - ${threatData.hashes[hash]}</li>`;
   }
+  html += "</ul>";
+
+  resultsDiv.innerHTML = html;
 }
 
-// Add a single row
-function addRow(type, indicator, status) {
-  const row = document.createElement('tr');
-  row.innerHTML = `
-    <td>${type}</td>
-    <td>${indicator}</td>
-    <td class="status-${status}">${status}</td>
-  `;
-  tableBody.appendChild(row);
-}
-
-// Search functionality
-searchForm.addEventListener('submit', (e) => {
+// --- SEARCH FUNCTION ---
+form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const query = searchInput.value.trim().toLowerCase();
+  const query = input.value.trim();
   if (!query) return;
-  
-  const filteredData = { ips: {}, domains: {}, hashes: {} };
-  
-  for (const [ip, status] of Object.entries(threatData.ips || {})) {
-    if (ip.includes(query)) filteredData.ips[ip] = status;
-  }
-  for (const [domain, status] of Object.entries(threatData.domains || {})) {
-    if (domain.includes(query)) filteredData.domains[domain] = status;
-  }
-  for (const [hash, status] of Object.entries(threatData.hashes || {})) {
-    if (hash.includes(query)) filteredData.hashes[hash] = status;
+
+  let found = false;
+
+  if (threatData.ips[query]) {
+    detectedType.textContent = `IP - ${threatData.ips[query]}`;
+    found = true;
+  } else if (threatData.domains[query]) {
+    detectedType.textContent = `Domain - ${threatData.domains[query]}`;
+    found = true;
+  } else if (threatData.hashes[query]) {
+    detectedType.textContent = `Hash - ${threatData.hashes[query]}`;
+    found = true;
+  } else {
+    detectedType.textContent = "unknown";
   }
 
-  displayTable(filteredData);
+  if (found) {
+    alert(`Threat found: ${query}`);
+  }
 });
 
-// Initial fetch
-fetchThreatFeed();
-
-// Refresh every 24 hours
-setInterval(fetchThreatFeed, 24 * 60 * 60 * 1000);
+// --- INITIAL LOAD ---
+fetchThreats();
