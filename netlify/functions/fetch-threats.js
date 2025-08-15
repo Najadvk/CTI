@@ -10,11 +10,12 @@ export async function handler(event) {
     };
   }
 
-  // Handle IP lookup
+  // Handle IP lookup (AbuseIPDB)
   if (event.queryStringParameters && event.queryStringParameters.ip) {
     const ip = event.queryStringParameters.ip;
     try {
       const res = await fetchWithRetry(`https://api.abuseipdb.com/api/v2/check?ipAddress=${ip}&maxAgeInDays=90&verbose`, API_KEY);
+      console.log(`IP check for ${ip}: status ${res.status}`);
       if (!res.ok) {
         if (res.status === 429) {
           const retryAfter = parseInt(res.headers.get("Retry-After")) || 3600;
@@ -41,50 +42,61 @@ export async function handler(event) {
     }
   }
 
-  // Handle feed fetch
+  // Handle combined FireHOL and Spamhaus blocklist fetch
   try {
-    const res = await fetchWithRetry("https://api.abuseipdb.com/api/v2/blacklist?confidenceMinimum=100&limit=50", API_KEY);
-    if (!res.ok) {
-      if (res.status === 429) {
-        const retryAfter = parseInt(res.headers.get("Retry-After")) || 3600;
-        console.log(`Blacklist 429: Retry-After ${retryAfter}s`);
-        return { statusCode: 429, body: JSON.stringify({ error: `Rate limit exceeded, retry after ${retryAfter} seconds` }) };
-      }
-      if (res.status === 401) return { statusCode: 401, body: JSON.stringify({ error: "Invalid API key" }) };
-      throw new Error(`HTTP error: ${res.status}`);
-    }
-    const data = await res.json();
-    console.log("Blacklist response:", data);
+    // Fetch FireHOL level1.netset
+    const fireholRes = await fetchWithRetry("https://iplists.firehol.org/files/firehol_level1.netset");
+    console.log("FireHOL fetch status:", fireholRes.status);
+    if (!fireholRes.ok) throw new Error(`FireHOL HTTP error: ${firefoxRes.status}`);
+    const fireholText = await fireholRes.text();
+    const fireholLines = fireholText.split("\n").filter(line => line && !line.startsWith("#"));
+    const fireholFeed = fireholLines.slice(0, 50).map(line => ({
+      ipAddress: line.trim(),
+      status: "Malicious",
+      source: "FireHOL"
+    }));
 
-    if (!data.data || !Array.isArray(data.data)) {
-      console.warn("No data in blacklist response");
+    // Fetch Spamhaus DROP list
+    const spamhausRes = await fetchWithRetry("https://www.spamhaus.org/drop/drop.txt");
+    console.log("Spamhaus fetch status:", spamhausRes.status);
+    if (!spamhausRes.ok) throw new Error(`Spamhaus HTTP error: ${spamhausRes.status}`);
+    const spamhausText = await spamhausRes.text();
+    const spamhausLines = spamhausText.split("\n").filter(line => line && !line.startsWith(";"));
+    const spamhausFeed = spamhausLines.slice(0, 50).map(line => ({
+      ipAddress: line.split(";")[0].trim(),
+      status: "Malicious",
+      source: "Spamhaus"
+    }));
+
+    // Combine feeds (deduplicate by ipAddress)
+    const combinedFeed = [...new Map([...firefoxFeed, ...spamhausFeed].map(item => [item.ipAddress, item])).values()].slice(0, 100);
+    console.log("Combined feed parsed:", combinedFeed.length, "entries");
+
+    if (combinedFeed.length === 0) {
+      console.warn("No data in FireHOL/Spamhaus response");
       return {
         statusCode: 200,
-        body: JSON.stringify({ error: "No data returned from blacklist endpoint" })
+        body: JSON.stringify({ error: "No data returned from FireHOL/Spamhaus blocklists" })
       };
     }
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ type: "feed", feed: data })
+      body: JSON.stringify({ type: "feed", feed: combinedFeed })
     };
   } catch (err) {
-    console.error("Blacklist fetch error:", err);
+    console.error("Blocklist fetch error:", err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: `Failed to fetch blacklist: ${err.message}` })
+      body: JSON.stringify({ error: `Failed to fetch FireHOL/Spamhaus blocklists: ${err.message}` })
     };
   }
 }
 
-async function fetchWithRetry(url, apiKey, retries = 1, backoff = 1000) {
+async function fetchWithRetry(url, apiKey = null, retries = 1, backoff = 1000) {
   for (let i = 0; i <= retries; i++) {
-    const res = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        Key: apiKey
-      }
-    });
+    const headers = apiKey ? { Accept: "application/json", Key: apiKey } : {};
+    const res = await fetch(url, { headers });
     console.log(`Fetch attempt ${i + 1} for ${url}: status ${res.status}`);
 
     if (res.ok) return res;
