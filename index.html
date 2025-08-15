@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CTI Portal – Dark</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>CTI Portal</h1>
+      <p class="sub">No signups required • IP • Domain • Hash</p>
+    </header>
+
+    <form id="search-form" class="search">
+      <input id="ioc" class="input" placeholder="Enter IP, domain, or hash" autocomplete="off" />
+      <button class="btn" type="submit">Search</button>
+    </form>
+
+    <div id="detected" class="detected">Detected: <span id="detected-type">unknown</span></div>
+    <div id="alerts" class="alerts"></div>
+
+    <div id="results" class="results"></div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
