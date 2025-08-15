@@ -1,33 +1,28 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CTI Portal – Threat Feed</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Threat Intelligence Feed</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <header class="header">
-      <h1>CTI Portal</h1>
-      <p class="sub">Public Threat Feed • IP • Domain • Hash</p>
-    </header>
+    <h1>Threat Intelligence Lookup</h1>
 
-    <form id="search-form" class="search">
-      <input id="ioc" class="input" placeholder="Search IP, domain, or hash" autocomplete="off" />
-      <button class="btn" type="submit">Search</button>
+    <!-- Search form -->
+    <form id="search-form">
+      <input 
+        type="text" 
+        id="ioc" 
+        placeholder="Enter IP address to check..." 
+        required 
+      />
+      <button type="submit">Search</button>
     </form>
 
-    <table id="threat-table">
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Indicator</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <!-- Where results will appear -->
+    <div id="results"></div>
   </div>
 
   <script src="main.js"></script>
