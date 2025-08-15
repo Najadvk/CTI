@@ -1,39 +1,43 @@
-const fetch = require("node-fetch");
+// /functions/fetch-threats.js
+const fetch = require("node-fetch"); // Netlify Functions uses Node.js
 
-exports.handler = async () => {
+exports.handler = async function () {
   try {
-    // Example sources (free public threat feeds)
-    const feeds = [
-      "https://raw.githubusercontent.com/stamparm/ipsum/main/ipsum.txt", // Malicious IPs
-      "https://mirror.cedia.org.ec/malwaredomains/justdomains", // Malicious Domains
-    ];
+    // AbuseIPDB DROP list CSV (static)
+    const url = "https://www.abuseipdb.com/blacklist?list=all&format=csv";
 
-    const threatData = { ips: {}, domains: {}, hashes: {} };
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
 
-    // Fetch IPs
-    const ipRes = await fetch(feeds[0]);
-    const ipText = await ipRes.text();
-    ipText.split("\n").forEach(line => {
-      const ip = line.trim();
-      if (ip) threatData.ips[ip] = "malicious";
-    });
+    const text = await res.text();
+    const lines = text.split("\n");
 
-    // Fetch Domains
-    const domRes = await fetch(feeds[1]);
-    const domText = await domRes.text();
-    domText.split("\n").forEach(line => {
-      const dom = line.trim();
-      if (dom && !dom.startsWith("#")) threatData.domains[dom] = "malicious";
-    });
+    let ips = {};
+    let domains = {}; // You can add domain feeds later
+    let hashes = {}; // You can add hash feeds later
+
+    // Parse CSV: first line is headers
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const ip = line.split(",")[0].replace(/"/g, "");
+      ips[ip] = "malicious";
+    }
 
     return {
       statusCode: 200,
-      body: JSON.stringify(threatData),
+      body: JSON.stringify({ ips, domains, hashes }),
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
     };
   } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      body: JSON.stringify({ error: err.message })
     };
   }
 };
