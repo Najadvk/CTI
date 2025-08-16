@@ -47,7 +47,7 @@ export async function handler(event) {
     // Fetch FireHOL level1.netset
     const fireholRes = await fetchWithRetry("https://iplists.firehol.org/files/firehol_level1.netset");
     console.log("FireHOL fetch status:", fireholRes.status);
-    if (!fireholRes.ok) throw new Error(`FireHOL HTTP error: ${firefoxRes.status}`);
+    if (!fireholRes.ok) throw new Error(`FireHOL HTTP error: ${fireholRes.status}`);
     const fireholText = await fireholRes.text();
     const fireholLines = fireholText.split("\n").filter(line => line && !line.startsWith("#"));
     const fireholFeed = fireholLines.slice(0, 50).map(line => ({
@@ -68,8 +68,8 @@ export async function handler(event) {
       source: "Spamhaus"
     }));
 
-    // Combine feeds (deduplicate by ipAddress)
-    const combinedFeed = [...new Map([...firefoxFeed, ...spamhausFeed].map(item => [item.ipAddress, item])).values()].slice(0, 100);
+    // Combine feeds (deduplicate by ipAddress) - Fixed variable name bug
+    const combinedFeed = [...new Map([...fireholFeed, ...spamhausFeed].map(item => [item.ipAddress, item])).values()].slice(0, 100);
     console.log("Combined feed parsed:", combinedFeed.length, "entries");
 
     if (combinedFeed.length === 0) {
@@ -110,3 +110,6 @@ async function fetchWithRetry(url, apiKey = null, retries = 1, backoff = 1000) {
     return res;
   }
 }
+
+
+
