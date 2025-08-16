@@ -17,35 +17,70 @@
   </header>
   <div class="container">
     <div class="search-section">
-      <h2>IP Lookup</h2>
-      <p>Check IP addresses using AbuseIPDB (limited to 5 checks/day)</p>
+      <h2>🔍 IP Address Lookup</h2>
+      <p>Check IP addresses using AbuseIPDB (limited to 5 checks/day for free tier)</p>
       <div class="search">
-        <input id="searchInput" class="input" type="text" placeholder="Enter IP address (e.g., 8.8.8.8)">
-        <button onclick="searchIP()" class="btn">Search</button>
+        <input id="searchInput" class="input" type="text" placeholder="Enter IP address (e.g., 8.8.8.8)" autocomplete="off">
+        <button onclick="searchIP()" class="btn">🔍 Search</button>
       </div>
       <div id="searchResult"></div>
     </div>
+    
     <div class="threat-feeds">
-      <h2>Threat Feeds</h2>
-      <p>Latest malicious IPs, domains, and hashes (auto-updates every 10 minutes)</p>
+      <h2>📡 Threat Intelligence Feeds</h2>
+      <p>Latest malicious indicators from multiple sources (auto-updates every 10 minutes)</p>
+      
       <div class="feed-grid">
         <div class="feed-item">
-          <h3>Malicious IPs</h3>
-          <div id="ipFeed"></div>
+          <h3>🚨 Malicious IPs</h3>
+          <div id="ipFeed">Loading...</div>
         </div>
         <div class="feed-item">
-          <h3>Malicious Domains</h3>
-          <div id="domainFeed"></div>
+          <h3>🌐 Malicious Domains</h3>
+          <div id="domainFeed">Loading...</div>
         </div>
         <div class="feed-item">
-          <h3>Malicious Hashes</h3>
-          <div id="hashFeed"></div>
+          <h3>🔒 Malicious Hashes</h3>
+          <div id="hashFeed">Loading...</div>
         </div>
       </div>
-      <button onclick="refreshFeed()" class="btn">Refresh Feeds</button>
-      <p id="feedStatus">Loading threat feeds...</p>
+      
+      <div class="feed-controls">
+        <button onclick="refreshFeed()" class="btn">🔄 Refresh Feeds</button>
+        <p id="feedStatus">Loading threat feeds...</p>
+      </div>
+    </div>
+    
+    <div class="info-section">
+      <h2>ℹ️ Information</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <h3>Data Sources</h3>
+          <ul>
+            <li><strong>AbuseIPDB:</strong> IP reputation and abuse reports</li>
+            <li><strong>FireHOL:</strong> Malicious IP blacklists</li>
+            <li><strong>Spamhaus:</strong> Spam and malware IP lists</li>
+          </ul>
+        </div>
+        <div class="info-item">
+          <h3>Threat Levels</h3>
+          <ul>
+            <li><span class="status-clean">CLEAN:</span> 0-24% abuse confidence</li>
+            <li><span style="color: #ffaa00;">LOW RISK:</span> 25-49% abuse confidence</li>
+            <li><span style="color: #ff6600;">MEDIUM RISK:</span> 50-74% abuse confidence</li>
+            <li><span class="status-malicious">HIGH RISK:</span> 75-100% abuse confidence</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
+  
+  <footer class="footer">
+    <p>&copy; 2024 CTI-SOC Dashboard. Built for cybersecurity professionals.</p>
+  </footer>
+  
   <script src="main.js"></script>
 </body>
 </html>
+
+
