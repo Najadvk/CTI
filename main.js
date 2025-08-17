@@ -105,4 +105,15 @@ async function loadThreatFeeds(refresh = false) {
   }
 }
 
+
+// Refresh button handler
+document.getElementById("refresh-feed").addEventListener("click", () => {
+  loadThreatFeeds(true);
+});
+
+// Initial load on page ready
+document.addEventListener("DOMContentLoaded", () => {
+  loadThreatFeeds(false);
+});
+
 // Assume renderFeeds, renderStaticFeeds, startAutoRefresh are defined elsewhere in main.js
