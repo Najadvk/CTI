@@ -111,22 +111,52 @@ function renderStaticFeeds() {
   const hashFeedDiv = document.getElementById("hashFeed");
 
   ipFeedDiv.innerHTML = `
-    <ul>
-      <li>192.168.1.100 (Sample - Malicious)</li>
-      <li>45.33.32.156 (Sample - Malicious)</li>
-    </ul>
+    <div class="feed-list">
+      <div class="feed-item">
+        <span class="feed-value">192.168.1.100</span>
+        <span class="feed-meta">Sample - Malicious</span>
+        <span class="feed-timestamp">${new Date().toISOString().split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      </div>
+      <div class="feed-item">
+        <span class="feed-value">45.33.32.156</span>
+        <span class="feed-meta">Sample - Malicious</span>
+        <span class="feed-timestamp">${new Date().toISOString().split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      </div>
+    </div>
   `;
   domainFeedDiv.innerHTML = `
-    <ul>
-      <li>phishing-site.com (Sample - Malicious)</li>
-      <li>bad-domain.net (Sample - Malicious)</li>
-    </ul>
+    <div class="feed-list">
+      <div class="feed-item">
+        <span class="feed-value">phishing-site.com</span>
+        <span class="feed-meta">Sample - Malicious</span>
+        <span class="feed-timestamp">${new Date().toISOString().split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      </div>
+      <div class="feed-item">
+        <span class="feed-value">bad-domain.net</span>
+        <span class="feed-meta">Sample - Malicious</span>
+        <span class="feed-timestamp">${new Date().toISOString().split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      </div>
+    </div>
   `;
   hashFeedDiv.innerHTML = `
-    <ul>
-      <li>d41d8cd98f00b204e9800998ecf8427e (Sample - Malicious)</li>
-      <li>44d88612fea8a8f36de82e1278abb02f (Sample - Malicious)</li>
-    </ul>
+    <div class="feed-list">
+      <div class="feed-item">
+        <span class="feed-value">d41d8cd98f00b204e9800998ecf8427e</span>
+        <span class="feed-meta">Sample - Malicious</span>
+        <span class="feed-timestamp">${new Date().toISOString().split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      </div>
+      <div class="feed-item">
+        <span class="feed-value">44d88612fea8a8f36de82e1278abb02f</span>
+        <span class="feed-meta">Sample - Malicious</span>
+        <span class="feed-timestamp">${new Date().toISOString().split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      </div>
+    </div>
   `;
 }
 
@@ -135,19 +165,19 @@ function renderFeeds(result) {
   const domainFeedDiv = document.getElementById("domainFeed");
   const hashFeedDiv = document.getElementById("hashFeed");
 
-  ipFeedDiv.innerHTML = "<ul></ul>";
-  domainFeedDiv.innerHTML = "<ul></ul>";
-  hashFeedDiv.innerHTML = "<ul></ul>";
+  ipFeedDiv.innerHTML = '<div class="feed-list"></div>';
+  domainFeedDiv.innerHTML = '<div class="feed-list"></div>';
+  hashFeedDiv.innerHTML = '<div class="feed-list"></div>';
 
-  const ipList = ipFeedDiv.querySelector("ul");
-  const domainList = domainFeedDiv.querySelector("ul");
-  const hashList = hashFeedDiv.querySelector("ul");
+  const ipContainer = ipFeedDiv.querySelector(".feed-list");
+  const domainContainer = domainFeedDiv.querySelector(".feed-list");
+  const hashContainer = hashFeedDiv.querySelector(".feed-list");
 
   if (!result.feed || !Array.isArray(result.feed)) {
     console.error("Invalid feed data:", result);
-    ipList.innerHTML = "<li>No IP data available.</li>";
-    domainList.innerHTML = "<li>No domain data available.</li>";
-    hashList.innerHTML = "<li>No hash data available.</li>";
+    ipContainer.innerHTML = '<div class="feed-item"><span class="feed-value">No IP data available.</span><span class="status-badge status-malicious">Error</span></div>';
+    domainContainer.innerHTML = '<div class="feed-item"><span class="feed-value">No domain data available.</span><span class="status-badge status-malicious">Error</span></div>';
+    hashContainer.innerHTML = '<div class="feed-item"><span class="feed-value">No hash data available.</span><span class="status-badge status-malicious">Error</span></div>';
     return;
   }
 
@@ -156,35 +186,51 @@ function renderFeeds(result) {
       console.warn(`Skipping null feed item at index ${index}`);
       return;
     }
-    const li = document.createElement("li");
+    const div = document.createElement("div");
+    div.className = "feed-item";
     if (item.ipAddress) {
-      li.textContent = `${item.ipAddress} (${item.category} - ${item.source})`;
-      ipList.appendChild(li);
+      div.innerHTML = `
+        <span class="feed-value">${item.ipAddress}</span>
+        <span class="feed-meta">${item.category} - ${item.source}</span>
+        <span class="feed-timestamp">${item.first_seen.split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      `;
+      ipContainer.appendChild(div);
     } else if (item.domain) {
-      li.textContent = `${item.domain} (${item.category} - ${item.source})`;
-      domainList.appendChild(li);
+      div.innerHTML = `
+        <span class="feed-value">${item.domain}</span>
+        <span class="feed-meta">${item.category} - ${item.source}</span>
+        <span class="feed-timestamp">${item.first_seen.split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      `;
+      domainContainer.appendChild(div);
     } else if (item.hash) {
-      li.textContent = `${item.hash} (${item.category} - ${item.source})`;
-      hashList.appendChild(li);
+      div.innerHTML = `
+        <span class="feed-value">${item.hash.substring(0, 16)}...</span>
+        <span class="feed-meta">${item.category} - ${item.source}</span>
+        <span class="feed-timestamp">${item.first_seen.split("T")[0]}</span>
+        <span class="status-badge status-malicious">Malicious</span>
+      `;
+      hashContainer.appendChild(div);
     } else {
       console.warn(`Invalid feed item at index ${index}:`, item);
     }
   });
 
   console.log("Rendered feed:", {
-    ipCount: ipList.children.length,
-    domainCount: domainList.children.length,
-    hashCount: hashList.children.length,
+    ipCount: ipContainer.children.length,
+    domainCount: domainContainer.children.length,
+    hashCount: hashContainer.children.length,
   });
 
-  if (ipList.children.length === 0) {
-    ipList.innerHTML = "<li>No IP data available.</li>";
+  if (ipContainer.children.length === 0) {
+    ipContainer.innerHTML = '<div class="feed-item"><span class="feed-value">No IP data available.</span><span class="status-badge status-malicious">Error</span></div>';
   }
-  if (domainList.children.length === 0) {
-    domainList.innerHTML = "<li>No domain data available.</li>";
+  if (domainContainer.children.length === 0) {
+    domainContainer.innerHTML = '<div class="feed-item"><span class="feed-value">No domain data available.</span><span class="status-badge status-malicious">Error</span></div>';
   }
-  if (hashList.children.length === 0) {
-    hashList.innerHTML = "<li>No hash data available.</li>";
+  if (hashContainer.children.length === 0) {
+    hashContainer.innerHTML = '<div class="feed-item"><span class="feed-value">No hash data available.</span><span class="status-badge status-malicious">Error</span></div>';
   }
 }
 
