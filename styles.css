@@ -177,41 +177,61 @@ body {
   gap: 8px;
 }
 
-.feed-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
 .feed-list {
   max-height: 300px;
   overflow-y: auto;
   border: 1px solid #334466;
   border-radius: 8px;
   background: rgba(0,0,0,0.2);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .feed-item {
+  background: #2a3a52;
+  border: 1px solid #4a5568;
+  border-radius: 8px;
   padding: 12px 15px;
-  border-bottom: 1px solid #334466;
-  cursor: pointer;
-  transition: all 0.2s ease;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .feed-item:hover {
-  background-color: rgba(74, 158, 255, 0.1);
-  border-left: 3px solid #4a9eff;
+  transform: translateY(-2px);
+  border-color: #4a9eff;
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.2);
+  background: #334466;
 }
 
-.feed-item:last-child {
-  border-bottom: none;
+.feed-value {
+  flex: 2;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e1e8f0;
+  word-break: break-all;
 }
 
-/* Status Badges */
+.feed-meta {
+  flex: 1;
+  font-size: 12px;
+  color: #a1b2c3;
+  text-align: center;
+}
+
+.feed-timestamp {
+  flex: 1;
+  font-size: 12px;
+  color: #718096;
+  text-align: right;
+}
+
 .status-badge {
   padding: 4px 8px;
   border-radius: 12px;
@@ -475,4 +495,3 @@ select:focus {
   outline: 2px solid #4a9eff;
   outline-offset: 2px;
 }
-
