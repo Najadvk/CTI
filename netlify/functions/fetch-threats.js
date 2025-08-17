@@ -1,13 +1,13 @@
 import fetch from "node-fetch";
 
 export const handler = async (event) => {
-  console.log("fetch-threats function invoked.");
+  console.log("fetch-threats function invoked at", new Date().toISOString());
   console.log("Query string parameters:", event.queryStringParameters);
 
   // Handle lookup (IP, domain, hash)
   if (event.queryStringParameters && (event.queryStringParameters.ip || event.queryStringParameters.domain || event.queryStringParameters.hash)) {
     const indicator = event.queryStringParameters.ip || event.queryStringParameters.domain || event.queryStringParameters.hash;
-    const type = event.queryStringParameters.ip ? "ip" : event.queryStringParameters.domain ? "domain" : "hash";
+    const type = event.queryStringParameters.ip ? "ip" : event.queryStringParameters.domain ? "hash";
     const abuseIpDbApiKey = process.env.ABUSEIPDB_API_KEY;
 
     if (!abuseIpDbApiKey && type === "ip") {
@@ -64,12 +64,14 @@ export const handler = async (event) => {
     }
   }
 
-  // Fetch feeds
+  // Fetch feeds (last 24 hours where possible)
   const feed = [];
   const errors = [];
-  const MAX_ENTRIES_PER_FEED = 20; // Limit to ~1 MB total (20 entries × ~500 bytes × 5 sources ≈ 50 KB)
+  const MAX_ENTRIES_PER_FEED = 10; // Limit to ~5 KB per source (10 × ~500 bytes)
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+  const now = Date.now();
 
-  // FireHOL
+  // FireHOL (no timestamps, cap entries)
   try {
     const ipResponse = await fetchWithRetry("https://iplists.firehol.org/files/firehol_level1.netset");
     console.log("FireHOL fetch status:", ipResponse.status);
@@ -82,7 +84,7 @@ export const handler = async (event) => {
       category: "blocklist",
       source: "FireHOL",
       confidence: "high",
-      first_seen: new Date().toISOString(),
+      first_seen: new Date().toISOString(), // No timestamp, use current
     })));
     console.log("FireHOL parsed:", ipLines.length, "IPs");
   } catch (error) {
@@ -90,7 +92,7 @@ export const handler = async (event) => {
     console.error("Error fetching FireHOL feed:", error);
   }
 
-  // Spamhaus
+  // Spamhaus (no timestamps, cap entries)
   try {
     const spamhausResponse = await fetchWithRetry("https://www.spamhaus.org/drop/drop.txt");
     console.log("Spamhaus fetch status:", spamhausResponse.status);
@@ -103,7 +105,7 @@ export const handler = async (event) => {
       category: "drop",
       source: "Spamhaus",
       confidence: "high",
-      first_seen: new Date().toISOString(),
+      first_seen: new Date().toISOString(), // No timestamp, use current
     })));
     console.log("Spamhaus parsed:", spamhausLines.length, "IPs");
   } catch (error) {
@@ -111,147 +113,88 @@ export const handler = async (event) => {
     console.error("Error fetching Spamhaus feed:", error);
   }
 
-  // URLhaus
+  // URLhaus (24-hour recent feed)
   try {
-    const urlhausResponse = await fetchWithRetry("https://urlhaus.abuse.ch/downloads/text/");
+    const urlhausResponse = await fetchWithRetry("https://urlhaus-api.abuse.ch/v1/urls/recent/", {
+      headers: { Accept: "application/json" },
+    });
     console.log("URLhaus fetch status:", urlhausResponse.status);
     if (!urlhausResponse.ok) throw new Error(`URLhaus fetch error: ${urlhausResponse.status}`);
-    const urlhausText = await urlhausResponse.text();
-    const urlhausLines = urlhausText.split("\n").filter((line) => line && !line.startsWith("#")).slice(0, MAX_ENTRIES_PER_FEED);
-    feed.push(
-      ...urlhausLines
-        .map((line) => {
-          try {
-            const url = new URL(line.trim().startsWith("http") ? line.trim() : `http://${line.trim()}`);
-            return {
-              domain: url.hostname,
-              status: "malicious",
-              category: "malware",
-              source: "URLhaus",
-              confidence: "high",
-              first_seen: new Date().toISOString(),
-            };
-          } catch {
-            return null;
-          }
-        })
-        .filter((item) => item)
-    );
-    console.log("URLhaus parsed:", feed.filter((item) => item.domain).length, "domains");
+    const urlhausJson = await urlhausResponse.json();
+    const recentUrls = urlhausJson.urls
+      ?.filter((url) => {
+        const firstSeen = new Date(url.firstseen).getTime();
+        return now - firstSeen <= TWENTY_FOUR_HOURS_MS;
+      })
+      .slice(0, MAX_ENTRIES_PER_FEED)
+      .map((url) => ({
+        domain: new URL(url.url).hostname,
+        status: "malicious",
+        category: url.threat || "malware",
+        source: "URLhaus",
+        confidence: "high",
+        first_seen: url.firstseen,
+      }));
+    feed.push(...recentUrls);
+    console.log("URLhaus parsed:", recentUrls.length, "domains");
   } catch (error) {
     errors.push(`URLhaus: ${error.message}`);
     console.error("Error fetching URLhaus feed:", error);
   }
 
-  // MalwareBazaar
+  // MalwareBazaar (24-hour filter from 48-hour feed)
   try {
     const hashResponse = await fetchWithRetry("https://bazaar.abuse.ch/export/csv/recent/");
     console.log("MalwareBazaar fetch status:", hashResponse.status);
     if (!hashResponse.ok) throw new Error(`MalwareBazaar fetch error: ${hashResponse.status}`);
     const hashText = await hashResponse.text();
-    const hashLines = hashText.split("\n").filter((line) => line && !line.startsWith("#")).slice(1, MAX_ENTRIES_PER_FEED + 1);
-    feed.push(
-      ...hashLines
-        .map((line) => {
-          const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-          const hash = cols[2]?.replace(/"/g, "");
-          return hash && hash.length === 64
-            ? {
-                hash,
-                status: "malicious",
-                category: cols[6]?.replace(/"/g, "") || "malware",
-                source: "MalwareBazaar",
-                confidence: "high",
-                first_seen: cols[0]?.replace(/"/g, "") || new Date().toISOString(),
-              }
-            : null;
-        })
-        .filter((item) => item)
-    );
-    console.log("MalwareBazaar parsed:", feed.filter((item) => item.hash).length, "hashes");
+    const hashLines = hashText.split("\n").filter((line) => line && !line.startsWith("#")).slice(1);
+    const recentHashes = hashLines
+      .map((line) => {
+        const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+        const firstSeen = cols[0]?.replace(/"/g, "");
+        const hash = cols[2]?.replace(/"/g, "");
+        return firstSeen && hash && hash.length === 64 && new Date(firstSeen).getTime() >= now - TWENTY_FOUR_HOURS_MS
+          ? {
+              hash,
+              status: "malicious",
+              category: cols[6]?.replace(/"/g, "") || "malware",
+              source: "MalwareBazaar",
+              confidence: "high",
+              first_seen: firstSeen,
+            }
+          : null;
+      })
+      .filter((item) => item)
+      .slice(0, MAX_ENTRIES_PER_FEED);
+    feed.push(...recentHashes);
+    console.log("MalwareBazaar parsed:", recentHashes.length, "hashes");
   } catch (error) {
     errors.push(`MalwareBazaar: ${error.message}`);
     console.error("Error fetching MalwareBazaar feed:", error);
   }
 
-  // AlienVault OTX (Optional)
-  const otxApiKey = process.env.OTX_API_KEY || "YOUR_OTX_API_KEY_HERE";
-  if (otxApiKey && otxApiKey !== "YOUR_OTX_API_KEY_HERE") {
-    try {
-      const otxResponse = await fetchWithRetry("https://otx.alienvault.com/api/v1/pulses/subscribed", {
-        headers: { "X-OTX-API-KEY": otxApiKey },
-      });
-      console.log("OTX fetch status:", otxResponse.status);
-      if (!otxResponse.ok) throw new Error(`OTX fetch error: ${otxResponse.status}`);
-      const otxJson = await otxResponse.json();
-      if (otxJson.results) {
-        const otxEntries = [];
-        otxJson.results.slice(0, 5).forEach((pulse) => {
-          if (pulse.indicators) {
-            pulse.indicators.slice(0, 4).forEach((indicator) => {
-              const type = indicator.type;
-              const indicatorValue = indicator.indicator;
-              const source = "AlienVault OTX";
-              const firstSeen = indicator.created || new Date().toISOString();
-              if (type === "IPv4" || type === "IPv6") {
-                otxEntries.push({
-                  ipAddress: indicatorValue,
-                  status: "malicious",
-                  category: pulse.name,
-                  source,
-                  confidence: "medium",
-                  first_seen: firstSeen,
-                });
-              } else if (type === "domain") {
-                otxEntries.push({
-                  domain: indicatorValue,
-                  status: "malicious",
-                  category: pulse.name,
-                  source,
-                  confidence: "medium",
-                  first_seen: firstSeen,
-                });
-              } else if (type === "FileHash-MD5" || type === "FileHash-SHA1" || type === "FileHash-SHA256") {
-                otxEntries.push({
-                  hash: indicatorValue,
-                  status: "malicious",
-                  category: pulse.name,
-                  source,
-                  confidence: "medium",
-                  first_seen: firstSeen,
-                });
-              }
-            });
-          }
-        });
-        feed.push(...otxEntries.slice(0, MAX_ENTRIES_PER_FEED));
-        console.log("OTX parsed:", otxEntries.length, "items");
-      }
-    } catch (error) {
-      errors.push(`OTX: ${error.message}`);
-      console.error("Error fetching OTX feed:", error);
-    }
-  } else {
-    console.warn("OTX API key not configured. Skipping OTX feed.");
-  }
-
+  const responseBody = { type: "feed", feed, errors };
+  const responseSize = JSON.stringify(responseBody).length;
   console.log("Combined feed:", {
     ipCount: feed.filter((item) => item.ipAddress).length,
     domainCount: feed.filter((item) => item.domain).length,
     hashCount: feed.filter((item) => item.hash).length,
-    totalSize: JSON.stringify({ type: "feed", feed, errors }).length,
+    responseSizeBytes: responseSize,
   });
+
+  if (responseSize > 5 * 1024 * 1024) {
+    console.warn("Response size exceeds 5 MB, may trigger 413 error:", responseSize / 1024 / 1024, "MB");
+  }
 
   if (feed.length === 0 && errors.length > 0) {
     return { statusCode: 200, body: JSON.stringify({ error: `Failed to fetch feeds: ${errors.join(", ")}`, errors }) };
   }
 
-  return { statusCode: 200, body: JSON.stringify({ type: "feed", feed, errors }) };
+  return { statusCode: 200, body: JSON.stringify(responseBody) };
 };
 
-async function fetchWithRetry(url, options/
-
-System: = {}, retries = 2, backoff = 1000) {
+async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
   for (let i = 0; i <= retries; i++) {
     try {
       const response = await fetch(url, options);
