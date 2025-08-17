@@ -105,19 +105,6 @@ async function loadThreatFeeds(refresh = false) {
   }
 }
 
-
-// Refresh button handler
-document.getElementById("refresh-feed").addEventListener("click", () => {
-  loadThreatFeeds(true);
-});
-
-// Initial load on page ready
-document.addEventListener("DOMContentLoaded", () => {
-  loadThreatFeeds(false);
-});
-
-
-// Fallback static sample feeds (in case API/cached feed fails)
 function renderStaticFeeds() {
   const ipFeedDiv = document.getElementById("ipFeed");
   const domainFeedDiv = document.getElementById("domainFeed");
@@ -129,14 +116,12 @@ function renderStaticFeeds() {
       <li>45.33.32.156 (Sample - Malicious)</li>
     </ul>
   `;
-
   domainFeedDiv.innerHTML = `
     <ul>
       <li>phishing-site.com (Sample - Malicious)</li>
       <li>bad-domain.net (Sample - Malicious)</li>
     </ul>
   `;
-
   hashFeedDiv.innerHTML = `
     <ul>
       <li>d41d8cd98f00b204e9800998ecf8427e (Sample - Malicious)</li>
@@ -144,21 +129,83 @@ function renderStaticFeeds() {
     </ul>
   `;
 }
-// Auto-refresh feed every 10 minutes
+
+function renderFeeds(result) {
+  const ipFeedDiv = document.getElementById("ipFeed");
+  const domainFeedDiv = document.getElementById("domainFeed");
+  const hashFeedDiv = document.getElementById("hashFeed");
+
+  ipFeedDiv.innerHTML = "<ul></ul>";
+  domainFeedDiv.innerHTML = "<ul></ul>";
+  hashFeedDiv.innerHTML = "<ul></ul>";
+
+  const ipList = ipFeedDiv.querySelector("ul");
+  const domainList = domainFeedDiv.querySelector("ul");
+  const hashList = hashFeedDiv.querySelector("ul");
+
+  if (!result.feed || !Array.isArray(result.feed)) {
+    console.error("Invalid feed data:", result);
+    ipList.innerHTML = "<li>No IP data available.</li>";
+    domainList.innerHTML = "<li>No domain data available.</li>";
+    hashList.innerHTML = "<li>No hash data available.</li>";
+    return;
+  }
+
+  result.feed.forEach((item, index) => {
+    if (!item) {
+      console.warn(`Skipping null feed item at index ${index}`);
+      return;
+    }
+    const li = document.createElement("li");
+    if (item.ipAddress) {
+      li.textContent = `${item.ipAddress} (${item.category} - ${item.source})`;
+      ipList.appendChild(li);
+    } else if (item.domain) {
+      li.textContent = `${item.domain} (${item.category} - ${item.source})`;
+      domainList.appendChild(li);
+    } else if (item.hash) {
+      li.textContent = `${item.hash} (${item.category} - ${item.source})`;
+      hashList.appendChild(li);
+    } else {
+      console.warn(`Invalid feed item at index ${index}:`, item);
+    }
+  });
+
+  console.log("Rendered feed:", {
+    ipCount: ipList.children.length,
+    domainCount: domainList.children.length,
+    hashCount: hashList.children.length,
+  });
+
+  if (ipList.children.length === 0) {
+    ipList.innerHTML = "<li>No IP data available.</li>";
+  }
+  if (domainList.children.length === 0) {
+    domainList.innerHTML = "<li>No domain data available.</li>";
+  }
+  if (hashList.children.length === 0) {
+    hashList.innerHTML = "<li>No hash data available.</li>";
+  }
+}
+
 let autoRefreshTimer = null;
 
 function startAutoRefresh() {
-  // Clear any existing timer so we don't stack multiple
   if (autoRefreshTimer) {
     clearInterval(autoRefreshTimer);
   }
-
-  // Refresh every 10 minutes (600,000 ms)
   autoRefreshTimer = setInterval(() => {
     console.log("Auto refreshing threat feeds...");
-    loadThreatFeeds(true); // force refresh
+    loadThreatFeeds(true);
   }, 600000);
 }
 
+// Refresh button handler
+document.getElementById("refresh-feed").addEventListener("click", () => {
+  loadThreatFeeds(true);
+});
 
-// Assume renderFeeds, renderStaticFeeds, startAutoRefresh are defined elsewhere in main.js
+// Initial load on page ready
+document.addEventListener("DOMContentLoaded", () => {
+  loadThreatFeeds(false);
+});
