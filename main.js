@@ -116,4 +116,34 @@ document.addEventListener("DOMContentLoaded", () => {
   loadThreatFeeds(false);
 });
 
+
+// Fallback static sample feeds (in case API/cached feed fails)
+function renderStaticFeeds() {
+  const ipFeedDiv = document.getElementById("ipFeed");
+  const domainFeedDiv = document.getElementById("domainFeed");
+  const hashFeedDiv = document.getElementById("hashFeed");
+
+  ipFeedDiv.innerHTML = `
+    <ul>
+      <li>192.168.1.100 (Sample - Malicious)</li>
+      <li>45.33.32.156 (Sample - Malicious)</li>
+    </ul>
+  `;
+
+  domainFeedDiv.innerHTML = `
+    <ul>
+      <li>phishing-site.com (Sample - Malicious)</li>
+      <li>bad-domain.net (Sample - Malicious)</li>
+    </ul>
+  `;
+
+  hashFeedDiv.innerHTML = `
+    <ul>
+      <li>d41d8cd98f00b204e9800998ecf8427e (Sample - Malicious)</li>
+      <li>44d88612fea8a8f36de82e1278abb02f (Sample - Malicious)</li>
+    </ul>
+  `;
+}
+
+
 // Assume renderFeeds, renderStaticFeeds, startAutoRefresh are defined elsewhere in main.js
