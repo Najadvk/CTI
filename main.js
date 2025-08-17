@@ -1,4 +1,3 @@
-
 async function loadThreatFeeds(refresh = false) {
   const ipFeedDiv = document.getElementById("ipFeed");
   const domainFeedDiv = document.getElementById("domainFeed");
