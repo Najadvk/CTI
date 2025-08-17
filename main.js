@@ -413,5 +413,199 @@ function renderOfflineFallback(container, input, type) {
             <small style="color: #888;">IP reputation & abuse reports</small>
           </div>
           <div style="background: rgba(74, 158, 255, 0.1); padding: 8px; border-radius: 6px; border-left: 3px solid #4a9eff;">
-            <st
-(Content truncated due to size limit. Use page ranges or line ranges to read remaining content)
+            <strong style="color: #4a9eff;">ISC SANS DShield</strong><br>
+            <small style="color: #888;">Threat intelligence feeds</small>
+          </div>
+          <div style="background: rgba(74, 158, 255, 0.1); padding: 8px; border-radius: 6px; border-left: 3px solid #4a9eff;">
+            <strong style="color: #4a9eff;">PhishTank</strong><br>
+            <small style="color: #888;">Phishing domain database</small>
+          </div>
+          <div style="background: rgba(74, 158, 255, 0.1); padding: 8px; border-radius: 6px; border-left: 3px solid #4a9eff;">
+            <strong style="color: #4a9eff;">URLhaus</strong><br>
+            <small style="color: #888;">Malware URL sharing</small>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background: rgba(255, 107, 53, 0.1); padding: 12px; border-radius: 6px; border-left: 3px solid #ff6b35;">
+        <p style="margin: 0; font-size: 12px; color: #a1b2c3;">
+          <strong>Note:</strong> Deploy to Netlify with proper API keys to enable full threat intelligence functionality.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function renderIPResult(data, container) {
+  const statusClass = data.abuseConfidenceScore >= 50 ? 'status-malicious' : 'status-clean';
+  const verdict = data.abuseConfidenceScore >= 75 ? 'HIGH RISK' :
+                 data.abuseConfidenceScore >= 50 ? 'MEDIUM RISK' :
+                 data.abuseConfidenceScore >= 25 ? 'LOW RISK' : 'CLEAN';
+  
+  container.innerHTML += `
+    <div class="result-card" style="
+      background: linear-gradient(135deg, #334466 0%, #2a3a52 100%);
+      border: 1px solid #4a5568;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    ">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+          <h4 style="margin: 0; color: #4a9eff; font-size: 20px;">IP Address Analysis</h4>
+          <p style="margin: 5px 0 0; color: #888; font-size: 14px;">AbuseIPDB Report</p>
+        </div>
+        <div class="status-badge ${statusClass}" style="
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-weight: bold;
+          font-size: 14px;
+        ">${verdict}</div>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
+        <div class="info-card">
+          <h5 style="margin: 0 0 8px; color: #4a9eff;">Basic Information</h5>
+          <div class="info-grid">
+            <span>IP Address:</span><span style="font-family: monospace;">${data.ipAddress}</span>
+            <span>Country:</span><span>${data.countryCode || 'Unknown'}</span>
+            <span>ISP:</span><span>${data.isp || 'Unknown'}</span>
+            <span>Usage Type:</span><span>${data.usageType || 'Unknown'}</span>
+          </div>
+        </div>
+        
+        <div class="info-card">
+          <h5 style="margin: 0 0 8px; color: #4a9eff;">Threat Assessment</h5>
+          <div class="info-grid">
+            <span>Confidence Score:</span><span style="color: ${data.abuseConfidenceScore >= 50 ? '#ff4d4d' : '#4ade80'};">${data.abuseConfidenceScore}%</span>
+            <span>Total Reports:</span><span>${data.totalReports || 0}</span>
+            <span>Whitelisted:</span><span>${data.isWhitelisted ? 'Yes' : 'No'}</span>
+            <span>Last Reported:</span><span>${data.lastReportedAt ? new Date(data.lastReportedAt).toLocaleDateString() : 'Never'}</span>
+          </div>
+        </div>
+      </div>
+      
+      ${data.domain ? `
+        <div class="info-card" style="margin-bottom: 15px;">
+          <h5 style="margin: 0 0 8px; color: #4a9eff;">Domain Information</h5>
+          <p style="margin: 0; font-family: monospace; color: #e1e8f0;">${data.domain}</p>
+        </div>
+      ` : ''}
+      
+      <div class="info-card">
+        <h5 style="margin: 0 0 8px; color: #4a9eff;">Analysis Summary</h5>
+        <p style="margin: 0; color: #e1e8f0; line-height: 1.5;">
+          This IP address has been reported <strong>${data.totalReports || 0}</strong> times with an abuse confidence score of <strong>${data.abuseConfidenceScore}%</strong>.
+          ${data.abuseConfidenceScore >= 75 ? 'This indicates a high likelihood of malicious activity.' :
+            data.abuseConfidenceScore >= 50 ? 'This suggests potential suspicious activity.' :
+            data.abuseConfidenceScore >= 25 ? 'This shows minimal suspicious activity.' :
+            'This appears to be a clean IP address.'}
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function renderDomainResult(data, container) {
+  container.innerHTML += `
+    <div class="result-card" style="
+      background: linear-gradient(135deg, #334466 0%, #2a3a52 100%);
+      border: 1px solid #4a5568;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    ">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+          <h4 style="margin: 0; color: #4a9eff; font-size: 20px;">Domain Analysis</h4>
+          <p style="margin: 5px 0 0; color: #888; font-size: 14px;">Threat Intelligence Report</p>
+        </div>
+        <div class="status-badge status-${data.status.toLowerCase()}" style="
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-weight: bold;
+          font-size: 14px;
+          text-transform: uppercase;
+        ">${data.status}</div>
+      </div>
+      
+      <div class="info-card">
+        <h5 style="margin: 0 0 8px; color: #4a9eff;">Domain Information</h5>
+        <div class="info-grid">
+          <span>Domain:</span><span style="font-family: monospace;">${data.indicator}</span>
+          <span>Source:</span><span>${data.source}</span>
+          <span>Category:</span><span style="text-transform: capitalize;">${data.category}</span>
+          <span>Status:</span><span style="text-transform: capitalize; color: ${data.status === 'malicious' ? '#ff4d4d' : '#4ade80'};">${data.status}</span>
+        </div>
+      </div>
+      
+      <div class="info-card" style="margin-top: 15px;">
+        <h5 style="margin: 0 0 8px; color: #4a9eff;">Analysis Summary</h5>
+        <p style="margin: 0; color: #e1e8f0; line-height: 1.5;">
+          This domain has been flagged as <strong>${data.status}</strong> by ${data.source}. 
+          ${data.status === 'malicious' ? 'Exercise caution when accessing this domain.' : 'This domain appears to be safe.'}
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function renderHashResult(data, container) {
+  container.innerHTML += `
+    <div class="result-card" style="
+      background: linear-gradient(135deg, #334466 0%, #2a3a52 100%);
+      border: 1px solid #4a5568;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    ">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+          <h4 style="margin: 0; color: #4a9eff; font-size: 20px;">Hash Analysis</h4>
+          <p style="margin: 5px 0 0; color: #888; font-size: 14px;">Malware Intelligence Report</p>
+        </div>
+        <div class="status-badge status-${data.status.toLowerCase()}" style="
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-weight: bold;
+          font-size: 14px;
+          text-transform: uppercase;
+        ">${data.status}</div>
+      </div>
+      
+      <div class="info-card">
+        <h5 style="margin: 0 0 8px; color: #4a9eff;">Hash Information</h5>
+        <div class="info-grid">
+          <span>Hash:</span><span style="font-family: monospace; word-break: break-all;">${data.indicator}</span>
+          <span>Source:</span><span>${data.source}</span>
+          <span>Category:</span><span style="text-transform: capitalize;">${data.category}</span>
+          <span>Status:</span><span style="text-transform: capitalize; color: ${data.status === 'malicious' ? '#ff4d4d' : '#4ade80'};">${data.status}</span>
+        </div>
+      </div>
+      
+      <div class="info-card" style="margin-top: 15px;">
+        <h5 style="margin: 0 0 8px; color: #4a9eff;">Analysis Summary</h5>
+        <p style="margin: 0; color: #e1e8f0; line-height: 1.5;">
+          This file hash has been identified as <strong>${data.status}</strong> by ${data.source}. 
+          ${data.status === 'malicious' ? 'This file should be considered dangerous and quarantined.' : 'This file appears to be safe.'}
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+// Initialize the application
+document.addEventListener("DOMContentLoaded", function() {
+  loadThreatFeeds();
+  
+  // Add search on Enter key
+  document.getElementById("searchInput").addEventListener("keypress", function(event) {
+    if (event.key === "Enter") {
+      searchIndicator();
+    }
+  });
+});
+
