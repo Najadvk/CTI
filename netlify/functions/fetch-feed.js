@@ -2,7 +2,7 @@ import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
 
-const feedFile = path.join(process.cwd(), "feed.json");
+const feedFile = path.join('/tmp', "feed.json");
 
 export async function handler() {
   try {
@@ -13,7 +13,7 @@ export async function handler() {
     };
 
     // ---------- Fetch IP feed ----------
-    const ipResponse = await fetch("https://raw.githubusercontent.com/ktsaou/firehol/master/firehol_level1.netset");
+    const ipResponse = await fetch("https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset");
     const ipText = await ipResponse.text();
     const ipLines = ipText.split("\n").filter(line => line && !line.startsWith("#"));
     ipLines.forEach(ip => {
