@@ -26,7 +26,7 @@ export const handler = async () => {
         throw new Error(`FireHOL fetch error: ${ipResponse.status}`);
       } catch (error) {
         console.error(`Error fetching FireHOL from ${url}:`, error);
-        if (url === fireholUrls[firebaseUrls.length - 1]) throw error;
+        if (url === fireholUrls[fireholUrls.length - 1]) throw error;
       }
     }
     const ipText = await ipResponse.text();
@@ -188,4 +188,64 @@ export const handler = async () => {
         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
         const firstSeen = cols[0]?.replace(/"/g, "");
         const hash = cols[2]?.replace(/"/g, "");
-        const firstSeenTime = firstSeen
+        const firstSeenTime = firstSeen ? new Date(firstSeen).getTime() : null;
+        return firstSeen && hash && /^[a-fA-F0-9]{64}$/.test(hash) && firstSeenTime && !isNaN(firstSeenTime) && now - firstSeenTime <= TWENTY_FOUR_HOURS_MS
+          ? {
+              hash,
+              status: "malicious",
+              category: cols[6]?.replace(/"/g, "") || "malware",
+              source: "MalwareBazaar",
+              confidence: "high",
+              first_seen: firstSeen,
+            }
+          : null;
+      })
+      .filter((item) => item)
+      .slice(0, MAX_ENTRIES_PER_FEED);
+    feed.push(...recentHashes);
+    console.log("MalwareBazaar parsed:", recentHashes.length, "hashes");
+  } catch (error) {
+    errors.push(`MalwareBazaar: ${error.message}`);
+    console.error("Error fetching MalwareBazaar feed:", error);
+  }
+
+  const responseBody = { type: "feed", feed, errors };
+  const responseSize = Buffer.byteLength(JSON.stringify(responseBody), "utf8");
+  console.log("Combined feed:", {
+    ipCount: feed.filter((item) => item.ipAddress).length,
+    domainCount: feed.filter((item) => item.domain).length,
+    hashCount: feed.filter((item) => item.hash).length,
+    responseSizeBytes: responseSize,
+  });
+
+  if (responseSize > 5 * 1024 * 1024) {
+    console.warn("Response size exceeds 5 MB, may trigger 413 error:", responseSize / 1024 / 1024, "MB");
+    return { statusCode: 200, body: JSON.stringify({ error: "Response too large, please try again later", errors }) };
+  }
+
+  if (feed.length === 0 && errors.length > 0) {
+    return { statusCode: 200, body: JSON.stringify({ error: `Failed to fetch feeds: ${errors.join(", ")}`, errors }) };
+  }
+
+  return { statusCode: 200, body: JSON.stringify(responseBody) };
+};
+
+async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await fetch(url, { ...options, headers: { ...options.headers, "User-Agent": "CTI-SOC-Dashboard/1.0" } });
+      if (response.ok) return response;
+      if (response.status === 429 && i < retries) {
+        const retryAfter = parseInt(response.headers.get("Retry-After") || backoff, 10);
+        console.log(`Rate limit hit for ${url}, retrying after ${retryAfter}ms`);
+        await new Promise((resolve) => setTimeout(resolve, retryAfter));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      if (i === retries) throw error;
+      console.log(`Fetch error for ${url}, retrying after ${backoff}ms`);
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+    }
+  }
+}
