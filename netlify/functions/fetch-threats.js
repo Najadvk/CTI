@@ -21,11 +21,11 @@ export const handler = async (event, context) => {
       } else if (type === 'domain') {
         // AbuseIPDB does not directly support domain lookups, so we'll simulate a response or use another API if available
         // For now, return a placeholder response
-        return { statusCode: 200, body: JSON.stringify({ type: "lookup", data: { indicator: indicator, status: "clean", source: "Simulated", category: "N/A" } }) };
+        return { statusCode: 200, body: JSON.stringify({ type: "lookup", data: { indicator: indicator, status: "malicious", source: "Simulated", category: "N/A" } }) };
       } else if (type === 'hash') {
         // AbuseIPDB does not directly support hash lookups, so we'll simulate a response or use another API if available
         // For now, return a placeholder response
-        return { statusCode: 200, body: JSON.stringify({ type: "lookup", data: { indicator: indicator, status: "clean", source: "Simulated", category: "N/A" } }) };
+        return { statusCode: 200, body: JSON.stringify({ type: "lookup", data: { indicator: indicator, status: "malicious", source: "Simulated", category: "N/A" } }) };
       }
 
       const response = await fetch(url, {
