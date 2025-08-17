@@ -265,9 +265,13 @@ async function searchIndicator() {
   searchResult.innerHTML = '<p>Loading...</p>';
 
   try {
-    const apiKey = process.env.ABUSEIPDB_API_KEY; // Uses the key from Netlify environment
+    // Fetch API key from a server-side endpoint
+    const keyResponse = await fetch('/api/get-api-key');
+    if (!keyResponse.ok) throw new Error(`Failed to fetch API key: ${keyResponse.status}`);
+    const { apiKey } = await keyResponse.json();
+
     if (!apiKey) {
-      throw new Error("AbuseIPDB API key is not configured.");
+      throw new Error("AbuseIPDB API key is not available.");
     }
 
     // Validate if the input is an IP address (basic check)
