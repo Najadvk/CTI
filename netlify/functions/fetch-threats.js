@@ -5,7 +5,7 @@ export const handler = async () => {
 
   const feed = [];
   const errors = [];
-  const MAX_ENTRIES_PER_FEED = 10; // ~2.5 KB per source
+  const MAX_ENTRIES_PER_FEED = 15; // ~2.5 KB per source
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
   const now = Date.now();
 
