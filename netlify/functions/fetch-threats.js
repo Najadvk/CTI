@@ -3,20 +3,39 @@ import fetch from "node-fetch";
 export const handler = async () => {
   console.log("fetch-threats function invoked at", new Date().toISOString());
 
-  // Fetch feeds (last 24 hours where possible)
   const feed = [];
   const errors = [];
-  const MAX_ENTRIES_PER_FEED = 5; // Limit to ~2.5 KB per source (5 × ~500 bytes)
+  const MAX_ENTRIES_PER_FEED = 5; // ~2.5 KB per source (5 × ~500 bytes)
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
   const now = Date.now();
 
-  // FireHOL (no timestamps, cap entries)
+  // FireHOL (no timestamps, cap entries, fallback URL)
   try {
-    const ipResponse = await fetchWithRetry("https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset");
-    console.log("FireHOL fetch status:", ipResponse.status);
-    if (!ipResponse.ok) throw new Error(`FireHOL fetch error: ${ipResponse.status}`);
+    let ipResponse;
+    const fireholUrls = [
+      "https://iplists.firehol.org/files/firehol_level1.netset",
+      "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level1.netset",
+    ];
+    for (const url of fireholUrls) {
+      try {
+        ipResponse = await fetchWithRetry(url);
+        console.log(`FireHOL fetch status for ${url}:`, ipResponse.status);
+        if (ipResponse.ok) break;
+        throw new Error(`FireHOL fetch error: ${ipResponse.status}`);
+      } catch (error) {
+        console.error(`Error fetching FireHOL from ${url}:`, error);
+        if (url === fireholUrls[firebaseUrls.length - 1]) throw error;
+      }
+    }
     const ipText = await ipResponse.text();
-    const ipLines = ipText.split("\n").filter((line) => line && !line.startsWith("#")).slice(0, MAX_ENTRIES_PER_FEED);
+    const ipLines = ipText
+      .split("\n")
+      .filter((line) => {
+        const trimmed = line.trim();
+        return trimmed && !trimmed.startsWith("#") && /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/.test(trimmed);
+      })
+      .slice(0, MAX_ENTRIES_PER_FEED);
+    if (ipLines.length === 0) throw new Error("FireHOL: No valid IPs found");
     feed.push(...ipLines.map((ip) => ({
       ipAddress: ip.trim(),
       status: "malicious",
@@ -37,7 +56,13 @@ export const handler = async () => {
     console.log("Spamhaus fetch status:", spamhausResponse.status);
     if (!spamhausResponse.ok) throw new Error(`Spamhaus fetch error: ${spamhausResponse.status}`);
     const spamhausText = await spamhausResponse.text();
-    const spamhausLines = spamhausText.split("\n").filter((line) => line && !line.startsWith(";")).slice(0, MAX_ENTRIES_PER_FEED);
+    const spamhausLines = spamhausText
+      .split("\n")
+      .filter((line) => {
+        const trimmed = line.trim();
+        return trimmed && !trimmed.startsWith(";") && /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?/.test(trimmed.split(";")[0]);
+      })
+      .slice(0, MAX_ENTRIES_PER_FEED);
     feed.push(...spamhausLines.map((line) => ({
       ipAddress: line.split(";")[0].trim(),
       status: "malicious",
@@ -60,15 +85,19 @@ export const handler = async () => {
     console.log("URLhaus fetch status:", urlhausResponse.status);
     if (!urlhausResponse.ok) throw new Error(`URLhaus fetch error: ${urlhausResponse.status}`);
     const urlhausJson = await urlhausResponse.json();
+    if (!urlhausJson.urls || !Array.isArray(urlhausJson.urls)) {
+      throw new Error("URLhaus: Invalid response format");
+    }
     const recentUrls = urlhausJson.urls
-      ?.filter((url) => {
-        const firstSeen = new Date(url.firstseen).getTime();
+      .filter((url) => {
+        const firstSeen = url.firstseen ? new Date(url.firstseen).getTime() : null;
         return firstSeen && !isNaN(firstSeen) && now - firstSeen <= TWENTY_FOUR_HOURS_MS;
       })
       .slice(0, MAX_ENTRIES_PER_FEED)
       .map((url) => {
         try {
           const hostname = new URL(url.url.startsWith("http") ? url.url : `http://${url.url}`).hostname;
+          if (!hostname || hostname.includes(" ")) return null;
           return {
             domain: hostname,
             status: "malicious",
@@ -102,7 +131,7 @@ export const handler = async () => {
         const firstSeen = cols[0]?.replace(/"/g, "");
         const hash = cols[2]?.replace(/"/g, "");
         const firstSeenTime = firstSeen ? new Date(firstSeen).getTime() : null;
-        return firstSeen && hash && hash.length === 64 && firstSeenTime && !isNaN(firstSeenTime) && now - firstSeenTime <= TWENTY_FOUR_HOURS_MS
+        return firstSeen && hash && /^[a-fA-F0-9]{64}$/.test(hash) && firstSeenTime && !isNaN(firstSeenTime) && now - firstSeenTime <= TWENTY_FOUR_HOURS_MS
           ? {
               hash,
               status: "malicious",
@@ -123,7 +152,7 @@ export const handler = async () => {
   }
 
   const responseBody = { type: "feed", feed, errors };
-  const responseSize = JSON.stringify(responseBody).length;
+  const responseSize = Buffer.byteLength(JSON.stringify(responseBody), "utf8");
   console.log("Combined feed:", {
     ipCount: feed.filter((item) => item.ipAddress).length,
     domainCount: feed.filter((item) => item.domain).length,
@@ -133,6 +162,7 @@ export const handler = async () => {
 
   if (responseSize > 5 * 1024 * 1024) {
     console.warn("Response size exceeds 5 MB, may trigger 413 error:", responseSize / 1024 / 1024, "MB");
+    return { statusCode: 200, body: JSON.stringify({ error: "Response too large, please try again later", errors }) };
   }
 
   if (feed.length === 0 && errors.length > 0) {
