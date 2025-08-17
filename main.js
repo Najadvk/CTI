@@ -1,47 +1,3 @@
-async function loadMaliciousFeed() {
-  const feedDiv = document.getElementById("feed");
-  feedDiv.innerHTML = "<p>Loading malicious feed...</p>";
-
-  try {
-    const res = await fetch("/.netlify/functions/fetch-threats");
-    const data = await res.json();
-
-    if (!data.feed) {
-      feedDiv.innerHTML = "<p style='color:red;'>Failed to load threat feed.</p>";
-      return;
-    }
-
-    let html = "";
-
-    // Malicious IPs
-    html += `<h4>IPs (${Object.keys(data.feed.ips).length})</h4><ul>`;
-    Object.values(data.feed.ips).forEach(ip => {
-      html += `<li>${ip.indicator} (${ip.source})</li>`;
-    });
-    html += `</ul>`;
-
-    // Malicious Domains
-    html += `<h4>Domains (${Object.keys(data.feed.domains).length})</h4><ul>`;
-    Object.values(data.feed.domains).forEach(d => {
-      html += `<li>${d.indicator} (${d.source})</li>`;
-    });
-    html += `</ul>`;
-
-    // Malicious Hashes
-    html += `<h4>Hashes (${Object.keys(data.feed.hashes).length})</h4><ul>`;
-    Object.values(data.feed.hashes).forEach(h => {
-      html += `<li>${h.indicator} (${h.source})</li>`;
-    });
-    html += `</ul>`;
-
-    feedDiv.innerHTML = html;
-
-  } catch (err) {
-    feedDiv.innerHTML = `<p style='color:red;'>Error loading feed: ${err.message}</p>`;
-  }
-}
-
-
 let refreshInterval;
 
 async function loadThreatFeeds(refresh = false) {
@@ -277,25 +233,7 @@ function renderStaticFeeds() {
   const domainFeedDiv = document.getElementById("domainFeed");
   const hashFeedDiv = document.getElementById("hashFeed");
 
-  // Sample data for demonstration
-  const sampleIPs = [
-    { ipAddress: "45.146.164.125", status: "malicious", source: "Sample", category: "botnet", confidence: "high" },
-    { ipAddress: "118.25.6.39", status: "malicious", source: "Sample", category: "scanner", confidence: "high" },
-    { ipAddress: "185.173.35.14", status: "malicious", source: "Sample", category: "malware", confidence: "medium" },
-    { ipAddress: "103.196.36.10", status: "malicious", source: "Sample", category: "spam", confidence: "high" }
-  ];
-
-  const sampleDomains = [
-    { domain: "malicious-example.com", status: "malicious", source: "Sample", category: "phishing", confidence: "high" },
-    { domain: "phishing-site.net", status: "malicious", source: "Sample", category: "phishing", confidence: "high" },
-    { domain: "spam-domain.org", status: "malicious", source: "Sample", category: "spam", confidence: "medium" }
-  ];
-
-  const sampleHashes = [
-    { hash: "d41d8cd98f00b204e9800998ecf8427e", status: "malicious", source: "Sample", category: "trojan", confidence: "high" },
-    { hash: "098f6bcd4621d373cade4e832627b4f6", status: "malicious", source: "Sample", category: "ransomware", confidence: "high" },
-    { hash: "5d41402abc4b2a76b9719d911017c592", status: "malicious", source: "Sample", category: "malware", confidence: "medium" }
-  ];
+ 
 
   renderFeedList(ipFeedDiv, sampleIPs, 'ipAddress', 'IP');
   renderFeedList(domainFeedDiv, sampleDomains, 'domain', 'Domain');
