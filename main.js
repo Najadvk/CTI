@@ -233,7 +233,25 @@ function renderStaticFeeds() {
   const domainFeedDiv = document.getElementById("domainFeed");
   const hashFeedDiv = document.getElementById("hashFeed");
 
- 
+  // Sample data for demonstration
+  const sampleIPs = [
+    { ipAddress: "45.146.164.125", status: "malicious", source: "Sample", category: "botnet", confidence: "high" },
+    { ipAddress: "118.25.6.39", status: "malicious", source: "Sample", category: "scanner", confidence: "high" },
+    { ipAddress: "185.173.35.14", status: "malicious", source: "Sample", category: "malware", confidence: "medium" },
+    { ipAddress: "103.196.36.10", status: "malicious", source: "Sample", category: "spam", confidence: "high" }
+  ];
+
+  const sampleDomains = [
+    { domain: "malicious-example.com", status: "malicious", source: "Sample", category: "phishing", confidence: "high" },
+    { domain: "phishing-site.net", status: "malicious", source: "Sample", category: "phishing", confidence: "high" },
+    { domain: "spam-domain.org", status: "malicious", source: "Sample", category: "spam", confidence: "medium" }
+  ];
+
+  const sampleHashes = [
+    { hash: "d41d8cd98f00b204e9800998ecf8427e", status: "malicious", source: "Sample", category: "trojan", confidence: "high" },
+    { hash: "098f6bcd4621d373cade4e832627b4f6", status: "malicious", source: "Sample", category: "ransomware", confidence: "high" },
+    { hash: "5d41402abc4b2a76b9719d911017c592", status: "malicious", source: "Sample", category: "malware", confidence: "medium" }
+  ];
 
   renderFeedList(ipFeedDiv, sampleIPs, 'ipAddress', 'IP');
   renderFeedList(domainFeedDiv, sampleDomains, 'domain', 'Domain');
