@@ -144,6 +144,21 @@ function renderStaticFeeds() {
     </ul>
   `;
 }
+// Auto-refresh feed every 10 minutes
+let autoRefreshTimer = null;
+
+function startAutoRefresh() {
+  // Clear any existing timer so we don't stack multiple
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer);
+  }
+
+  // Refresh every 10 minutes (600,000 ms)
+  autoRefreshTimer = setInterval(() => {
+    console.log("Auto refreshing threat feeds...");
+    loadThreatFeeds(true); // force refresh
+  }, 600000);
+}
 
 
 // Assume renderFeeds, renderStaticFeeds, startAutoRefresh are defined elsewhere in main.js
