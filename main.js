@@ -1,3 +1,47 @@
+async function loadMaliciousFeed() {
+  const feedDiv = document.getElementById("feed");
+  feedDiv.innerHTML = "<p>Loading malicious feed...</p>";
+
+  try {
+    const res = await fetch("/.netlify/functions/fetch-threats");
+    const data = await res.json();
+
+    if (!data.feed) {
+      feedDiv.innerHTML = "<p style='color:red;'>Failed to load threat feed.</p>";
+      return;
+    }
+
+    let html = "";
+
+    // Malicious IPs
+    html += `<h4>IPs (${Object.keys(data.feed.ips).length})</h4><ul>`;
+    Object.values(data.feed.ips).forEach(ip => {
+      html += `<li>${ip.indicator} (${ip.source})</li>`;
+    });
+    html += `</ul>`;
+
+    // Malicious Domains
+    html += `<h4>Domains (${Object.keys(data.feed.domains).length})</h4><ul>`;
+    Object.values(data.feed.domains).forEach(d => {
+      html += `<li>${d.indicator} (${d.source})</li>`;
+    });
+    html += `</ul>`;
+
+    // Malicious Hashes
+    html += `<h4>Hashes (${Object.keys(data.feed.hashes).length})</h4><ul>`;
+    Object.values(data.feed.hashes).forEach(h => {
+      html += `<li>${h.indicator} (${h.source})</li>`;
+    });
+    html += `</ul>`;
+
+    feedDiv.innerHTML = html;
+
+  } catch (err) {
+    feedDiv.innerHTML = `<p style='color:red;'>Error loading feed: ${err.message}</p>`;
+  }
+}
+
+
 let refreshInterval;
 
 async function loadThreatFeeds(refresh = false) {
