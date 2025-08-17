@@ -197,7 +197,7 @@ export const handler = async () => {
 
   // MalwareBazaar (24-hour filter from 48-hour feed)
   try {
-    const hashResponse = await fetchWithRetry("https://bazaar.abuse.ch/export/csv/recent/", {
+    const hashResponse = await fetchWithRetry("https://bazaar.abuse.ch/export/txt/sha256/recent/", {
       headers: { "User-Agent": "CTI-SOC-Dashboard/1.0" },
     });
     console.log("MalwareBazaar fetch status:", hashResponse.status);
