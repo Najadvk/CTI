@@ -549,3 +549,15 @@ select:focus {
   outline-offset: 2px;
   box-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
 }
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.card {
+  background: linear-gradient(145deg, #1e1e2f, #2c2c3d);
+}
+
+
