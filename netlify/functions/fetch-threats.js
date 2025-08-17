@@ -1,73 +1,12 @@
 import fetch from "node-fetch";
 
-export const handler = async (event) => {
+export const handler = async () => {
   console.log("fetch-threats function invoked at", new Date().toISOString());
-  console.log("Query string parameters:", event.queryStringParameters);
-
-  // Handle lookup (IP, domain, hash)
-  if (event.queryStringParameters && (event.queryStringParameters.ip || event.queryStringParameters.domain || event.queryStringParameters.hash)) {
-    const indicator = event.queryStringParameters.ip || event.queryStringParameters.domain || event.queryStringParameters.hash;
-    const type = event.queryStringParameters.ip ? "ip" : event.queryStringParameters.domain ? "hash";
-    const abuseIpDbApiKey = process.env.ABUSEIPDB_API_KEY;
-
-    if (!abuseIpDbApiKey && type === "ip") {
-      console.error("AbuseIPDB API key not configured.");
-      return { statusCode: 500, body: JSON.stringify({ error: "AbuseIPDB API key not configured." }) };
-    }
-
-    try {
-      let url = "";
-      let options = { method: "GET", headers: { Accept: "application/json" } };
-      if (type === "ip") {
-        url = `https://api.abuseipdb.com/api/v2/check?ipAddress=${encodeURIComponent(indicator)}&maxAgeInDays=90&verbose=true`;
-        options.headers["Key"] = abuseIpDbApiKey;
-      } else if (type === "domain") {
-        url = `https://urlhaus-api.abuse.ch/v1/urls/recent/`;
-      } else if (type === "hash") {
-        url = `https://mb-api.abuse.ch/api/v1/`;
-        options = { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ query: "get_info", hash: indicator }) };
-      }
-
-      const response = await fetchWithRetry(url, options);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`${type} API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      if (type === "domain") {
-        const match = data.urls?.find((url) => new URL(url.url).hostname === indicator);
-        return {
-          statusCode: 200,
-          body: JSON.stringify({
-            type: "lookup",
-            data: match
-              ? { indicator, status: "malicious", source: "URLhaus", category: match.threat || "malware" }
-              : { indicator, status: "clean", source: "URLhaus", category: "none" },
-          }),
-        };
-      } else if (type === "hash") {
-        return {
-          statusCode: 200,
-          body: JSON.stringify({
-            type: "lookup",
-            data: data.query_status === "ok"
-              ? { indicator, status: "malicious", source: "MalwareBazaar", category: data.data?.[0]?.file_type || "malware" }
-              : { indicator, status: "clean", source: "MalwareBazaar", category: "none" },
-          }),
-        };
-      }
-      return { statusCode: 200, body: JSON.stringify({ type: "lookup", data }) };
-    } catch (error) {
-      console.error(`${type} lookup error:`, error);
-      return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
-    }
-  }
 
   // Fetch feeds (last 24 hours where possible)
   const feed = [];
   const errors = [];
-  const MAX_ENTRIES_PER_FEED = 10; // Limit to ~5 KB per source (10 × ~500 bytes)
+  const MAX_ENTRIES_PER_FEED = 5; // Limit to ~2.5 KB per source (5 × ~500 bytes)
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
   const now = Date.now();
 
@@ -84,7 +23,7 @@ export const handler = async (event) => {
       category: "blocklist",
       source: "FireHOL",
       confidence: "high",
-      first_seen: new Date().toISOString(), // No timestamp, use current
+      first_seen: new Date().toISOString(),
     })));
     console.log("FireHOL parsed:", ipLines.length, "IPs");
   } catch (error) {
@@ -105,7 +44,7 @@ export const handler = async (event) => {
       category: "drop",
       source: "Spamhaus",
       confidence: "high",
-      first_seen: new Date().toISOString(), // No timestamp, use current
+      first_seen: new Date().toISOString(),
     })));
     console.log("Spamhaus parsed:", spamhausLines.length, "IPs");
   } catch (error) {
@@ -124,17 +63,25 @@ export const handler = async (event) => {
     const recentUrls = urlhausJson.urls
       ?.filter((url) => {
         const firstSeen = new Date(url.firstseen).getTime();
-        return now - firstSeen <= TWENTY_FOUR_HOURS_MS;
+        return firstSeen && !isNaN(firstSeen) && now - firstSeen <= TWENTY_FOUR_HOURS_MS;
       })
       .slice(0, MAX_ENTRIES_PER_FEED)
-      .map((url) => ({
-        domain: new URL(url.url).hostname,
-        status: "malicious",
-        category: url.threat || "malware",
-        source: "URLhaus",
-        confidence: "high",
-        first_seen: url.firstseen,
-      }));
+      .map((url) => {
+        try {
+          const hostname = new URL(url.url.startsWith("http") ? url.url : `http://${url.url}`).hostname;
+          return {
+            domain: hostname,
+            status: "malicious",
+            category: url.threat || "malware",
+            source: "URLhaus",
+            confidence: "high",
+            first_seen: url.firstseen,
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((item) => item);
     feed.push(...recentUrls);
     console.log("URLhaus parsed:", recentUrls.length, "domains");
   } catch (error) {
@@ -154,7 +101,8 @@ export const handler = async (event) => {
         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
         const firstSeen = cols[0]?.replace(/"/g, "");
         const hash = cols[2]?.replace(/"/g, "");
-        return firstSeen && hash && hash.length === 64 && new Date(firstSeen).getTime() >= now - TWENTY_FOUR_HOURS_MS
+        const firstSeenTime = firstSeen ? new Date(firstSeen).getTime() : null;
+        return firstSeen && hash && hash.length === 64 && firstSeenTime && !isNaN(firstSeenTime) && now - firstSeenTime <= TWENTY_FOUR_HOURS_MS
           ? {
               hash,
               status: "malicious",
