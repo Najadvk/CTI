@@ -5,16 +5,17 @@ export const handler = async () => {
 
   const feed = [];
   const errors = [];
-  const MAX_ENTRIES_PER_FEED = 5; // ~2.5 KB per source (5 × ~500 bytes)
+  const MAX_ENTRIES_PER_FEED = 5; // ~2.5 KB per source
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
   const now = Date.now();
 
-  // FireHOL (no timestamps, cap entries, fallback URL)
+  // FireHOL (prioritize level3 for malicious IPs, fallback to level2)
   try {
     let ipResponse;
     const fireholUrls = [
-      "https://iplists.firehol.org/files/firehol_level1.netset",
-      "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level1.netset",
+      "https://iplists.firehol.org/files/firehol_level3.netset",
+      "https://iplists.firehol.org/files/firehol_level2.netset",
+      "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level3.netset",
     ];
     for (const url of fireholUrls) {
       try {
@@ -26,7 +27,7 @@ export const handler = async () => {
         throw new Error(`FireHOL fetch error: ${ipResponse.status}`);
       } catch (error) {
         console.error(`Error fetching FireHOL from ${url}:`, error);
-        if (url === fireholUrls[fireholUrls.length - 1]) throw error;
+        if (url === fireholUrls[firebaseUrls.length - 1]) throw error;
       }
     }
     const ipText = await ipResponse.text();
@@ -41,7 +42,7 @@ export const handler = async () => {
     feed.push(...ipLines.map((ip) => ({
       ipAddress: ip.trim(),
       status: "malicious",
-      category: "blocklist",
+      category: "malware/C2",
       source: "FireHOL",
       confidence: "high",
       first_seen: new Date().toISOString(),
@@ -52,25 +53,45 @@ export const handler = async () => {
     console.error("Error fetching FireHOL feed:", error);
   }
 
-  // Spamhaus (no timestamps, cap entries)
+  // Spamhaus (use DROP and EDROP for high-risk IPs)
   try {
-    const spamhausResponse = await fetchWithRetry("https://www.spamhaus.org/drop/drop.txt", {
-      headers: { "User-Agent": "CTI-SOC-Dashboard/1.0" },
-    });
-    console.log("Spamhaus fetch status:", spamhausResponse.status);
-    if (!spamhausResponse.ok) throw new Error(`Spamhaus fetch error: ${spamhausResponse.status}`);
-    const spamhausText = await spamhausResponse.text();
-    const spamhausLines = spamhausText
-      .split("\n")
-      .filter((line) => {
-        const trimmed = line.trim();
-        return trimmed && !trimmed.startsWith(";") && /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?/.test(trimmed.split(";")[0]);
-      })
-      .slice(0, MAX_ENTRIES_PER_FEED);
-    feed.push(...spamhausLines.map((line) => ({
-      ipAddress: line.split(";")[0].trim(),
+    let spamhausResponse;
+    const spamhausUrls = [
+      "https://www.spamhaus.org/drop/edrop.txt",
+      "https://www.spamhaus.org/drop/drop.txt",
+    ];
+    let spamhausLines = [];
+    for (const url of spamhausUrls) {
+      try {
+        spamhausResponse = await fetchWithRetry(url, {
+          headers: { "User-Agent": "CTI-SOC-Dashboard/1.0" },
+        });
+        console.log(`Spamhaus fetch status for ${url}:`, spamhausResponse.status);
+        if (!spamhausResponse.ok) throw new Error(`Spamhaus fetch error: ${spamhausResponse.status}`);
+        const spamhausText = await spamhausResponse.text();
+        const lines = spamhausText
+          .split("\n")
+          .filter((line) => {
+            const trimmed = line.trim();
+            return trimmed && !trimmed.startsWith(";") && /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?/.test(trimmed.split(";")[0]);
+          });
+        spamhausLines.push(...lines.map((line) => ({
+          ip: line.split(";")[0].trim(),
+          priority: url.includes("edrop") ? 1 : 0, // Prioritize EDROP
+        })));
+      } catch (error) {
+        console.error(`Error fetching Spamhaus from ${url}:`, error);
+        if (url === spamhausUrls[spamhausUrls.length - 1] && spamhausLines.length === 0) throw error;
+      }
+    }
+    spamhausLines = spamhausLines
+      .sort((a, b) => b.priority - a.priority) // EDROP first
+      .slice(0, MAX_ENTRIES_PER_FEED)
+      .map(({ ip }) => ip);
+    feed.push(...spamhausLines.map((ip) => ({
+      ipAddress: ip,
       status: "malicious",
-      category: "drop",
+      category: "botnet/C2",
       source: "Spamhaus",
       confidence: "high",
       first_seen: new Date().toISOString(),
