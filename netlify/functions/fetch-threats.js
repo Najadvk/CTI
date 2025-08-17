@@ -12,7 +12,7 @@ export const handler = async () => {
 
   // FireHOL (no timestamps, cap entries)
   try {
-    const ipResponse = await fetchWithRetry("https://iplists.firehol.org/files/firehol_level1.netset");
+    const ipResponse = await fetchWithRetry("https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset");
     console.log("FireHOL fetch status:", ipResponse.status);
     if (!ipResponse.ok) throw new Error(`FireHOL fetch error: ${ipResponse.status}`);
     const ipText = await ipResponse.text();
