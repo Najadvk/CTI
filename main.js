@@ -270,6 +270,12 @@ async function searchIndicator() {
       throw new Error("AbuseIPDB API key is not configured. Please set ABUSEIPDB_API_KEY in Netlify environment variables.");
     }
 
+    // Validate if the input is an IP address (basic check)
+    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!ipRegex.test(indicator)) {
+      throw new Error("Please enter a valid IP address (e.g., 8.8.8.8). Domains and hashes are not supported by this API.");
+    }
+
     const response = await fetch(`https://api.abuseipdb.com/api/v2/check`, {
       method: 'POST',
       headers: {
@@ -314,7 +320,7 @@ async function searchIndicator() {
     searchResult.innerHTML = resultCard;
   } catch (error) {
     console.error("Search error:", error);
-    searchResult.innerHTML = `<p style="color: #888;">Error: ${error.message}. Ensure ABUSEIPDB_API_KEY is set in Netlify environment variables.</p>`;
+    searchResult.innerHTML = `<p style="color: #888;">Error: ${error.message}</p>`;
   }
 }
 
